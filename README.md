@@ -8,5 +8,11 @@
 Soo, I'm here to fix it. Awesome WebUI is a **fork** of [Open WebUI](https://github.com/open-webui/open-webui) that aims to improve the user experience of Open WebUI. So, let's just get into details about our awesome changes!
 <small>(hah, you see what I did there?)</small>
 
-## List of changes
-There *isn't any*... at least yet!
+# List of changes
+## Admin Panel
+### #1. Models Tab
+
+![model list showing openai models: gpt 5, gpt 5.1, gpt 5.2, codex](preview/image.png)
+```diff
++ Added ability to multi-select models
++ Middle-click'ing model will open editor in new tab

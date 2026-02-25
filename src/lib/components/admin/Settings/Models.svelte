@@ -15,6 +15,7 @@
 		updateModelById,
 		importModels
 	} from '$lib/apis/models';
+	import { getGroups } from '$lib/apis/groups';
 	import { copyToClipboard } from '$lib/utils';
 	import { page } from '$app/stores';
 	import { updateUserSettings } from '$lib/apis/users';
@@ -52,19 +53,32 @@
 	let modelsImportInProgress = false;
 	let importFiles;
 	let modelsImportInputElement: HTMLInputElement;
+	let batchIconFiles;
+	let batchIconInputElement: HTMLInputElement;
+	let batchActionInProgress = false;
+	let batchIconPreviewUrl = '';
 
 	let models = null;
 
 	let workspaceModels = null;
 	let baseModels = null;
+	let groups = [];
 
 	let filteredModels = [];
 	let selectedModelId = null;
+	let selectedModelIds: string[] = [];
+	let lastSelectedModelId: string | null = null;
 
 	let showConfigModal = false;
 	let showManageModal = false;
 
 	let viewOption = ''; // '' = All, 'enabled', 'disabled', 'visible', 'hidden'
+	let batchAccessMode = 'private';
+	let batchGroupId = '';
+	let batchNameTemplate = '{name}';
+	let filterSignature = '';
+	let allFilteredSelected = false;
+	let selectedCountLabel = '';
 
 	const perPage = 30;
 	let currentPage = 1;
@@ -78,36 +92,180 @@
 				if (viewOption === 'visible') return !(m?.meta?.hidden ?? false);
 				if (viewOption === 'hidden') return m?.meta?.hidden === true;
 				return true; // All
-			})
-			.sort((a, b) => {
-				return (a?.name ?? a?.id ?? '').localeCompare(b?.name ?? b?.id ?? '');
 			});
 	}
 
 	let searchValue = '';
 
-	$: if (searchValue || viewOption !== undefined) {
-		currentPage = 1;
+	$: {
+		const nextSignature = JSON.stringify({ searchValue, viewOption });
+		if (nextSignature !== filterSignature) {
+			currentPage = 1;
+			filterSignature = nextSignature;
+		}
 	}
+
+	$: if (models) {
+		const modelIds = new Set(models.map((model) => model.id));
+		const nextSelectedModelIds = selectedModelIds.filter((id) => modelIds.has(id));
+		if (nextSelectedModelIds.length !== selectedModelIds.length) {
+			selectedModelIds = nextSelectedModelIds;
+		}
+
+		if (lastSelectedModelId && !modelIds.has(lastSelectedModelId)) {
+			lastSelectedModelId = null;
+		}
+	}
+
+	$: allFilteredSelected =
+		filteredModels.length > 0 && filteredModels.every((model) => selectedModelIds.includes(model.id));
+	$: selectedCountLabel = $i18n.t('{{COUNT}} models', { COUNT: selectedModelIds.length });
+	$: if (!batchGroupId && groups.length > 0) {
+		batchGroupId = groups[0].id;
+	}
+
+	const syncModelsStore = async () => {
+		_models.set(
+			await getModels(
+				localStorage.token,
+				$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
+			)
+		);
+	};
+
+	const setModelSelection = (modelId: string, shiftPressed = false) => {
+		const alreadySelected = selectedModelIds.includes(modelId);
+
+		if (shiftPressed && lastSelectedModelId) {
+			const orderedIds = filteredModels.map((model) => model.id);
+			const start = orderedIds.indexOf(lastSelectedModelId);
+			const end = orderedIds.indexOf(modelId);
+
+			if (start !== -1 && end !== -1) {
+				const [min, max] = start < end ? [start, end] : [end, start];
+				const rangeIds = orderedIds.slice(min, max + 1);
+
+				if (alreadySelected) {
+					selectedModelIds = selectedModelIds.filter((id) => !rangeIds.includes(id));
+				} else {
+					selectedModelIds = [...new Set([...selectedModelIds, ...rangeIds])];
+				}
+			} else if (alreadySelected) {
+				selectedModelIds = selectedModelIds.filter((id) => id !== modelId);
+			} else {
+				selectedModelIds = [...selectedModelIds, modelId];
+			}
+		} else if (alreadySelected) {
+			selectedModelIds = selectedModelIds.filter((id) => id !== modelId);
+		} else {
+			selectedModelIds = [...selectedModelIds, modelId];
+		}
+
+		lastSelectedModelId = modelId;
+	};
+
+	const toggleSelectAllFilteredModels = () => {
+		const filteredIds = filteredModels.map((model) => model.id);
+		const shouldUnselect = filteredIds.every((id) => selectedModelIds.includes(id));
+
+		if (shouldUnselect) {
+			selectedModelIds = selectedModelIds.filter((id) => !filteredIds.includes(id));
+			return;
+		}
+
+		selectedModelIds = [...new Set([...selectedModelIds, ...filteredIds])];
+	};
+
+	const clearSelection = () => {
+		selectedModelIds = [];
+		lastSelectedModelId = null;
+		batchIconPreviewUrl = '';
+	};
+
+	const selectedModels = () => {
+		const selectedIds = new Set(selectedModelIds);
+		return (models ?? []).filter((model) => selectedIds.has(model.id));
+	};
+
+	const selectedModelsInDisplayOrder = () => {
+		const selectedIds = new Set(selectedModelIds);
+		return filteredModels.filter((model) => selectedIds.has(model.id));
+	};
+
+	const openModelEditorInNewTab = (modelId: string) => {
+		const url = new URL(window.location.href);
+		url.searchParams.set('id', modelId);
+		url.searchParams.set('close_on_save', '1');
+		window.open(url.toString(), '_blank');
+	};
+
+	const shouldCloseOnSave = () => $page.url.searchParams.get('close_on_save') === '1';
+
+	const closeWindowIfRequested = async () => {
+		if (!shouldCloseOnSave()) {
+			return false;
+		}
+
+		try {
+			window.close();
+		} catch (error) {
+			console.error(error);
+			return false;
+		}
+
+		await tick();
+		if (!window.closed) {
+			const url = new URL(window.location.href);
+			url.searchParams.delete('close_on_save');
+			window.history.replaceState({}, '', url.toString());
+		}
+		return window.closed;
+	};
+
+	const persistModel = async (model, showSuccessToast = false) => {
+		model.base_model_id = null;
+
+		if (workspaceModels.find((m) => m.id === model.id)) {
+			const res = await updateModelById(localStorage.token, model.id, model).catch(() => {
+				return null;
+			});
+
+			if (res && showSuccessToast) {
+				toast.success($i18n.t('Model updated successfully'));
+			}
+
+			return !!res;
+		}
+
+		const res = await createNewModel(localStorage.token, {
+			meta: {},
+			id: model.id,
+			name: model.name,
+			base_model_id: null,
+			params: {},
+			access_grants: [],
+			...model
+		}).catch(() => {
+			return null;
+		});
+
+		if (res && showSuccessToast) {
+			toast.success($i18n.t('Model updated successfully'));
+		}
+
+		return !!res;
+	};
 
 	const enableAllHandler = async () => {
 		const modelsToEnable = filteredModels.filter((m) => !(m.is_active ?? true));
-		// Optimistic UI update
-		modelsToEnable.forEach((m) => (m.is_active = true));
-		models = models;
-		// Sync with server
-		await Promise.all(modelsToEnable.map((model) => toggleModelById(localStorage.token, model.id)));
+		await Promise.all(modelsToEnable.map((model) => setModelEnabledState(model, true, false)));
+		await syncModelsStore();
 	};
 
 	const disableAllHandler = async () => {
 		const modelsToDisable = filteredModels.filter((m) => m.is_active ?? true);
-		// Optimistic UI update
-		modelsToDisable.forEach((m) => (m.is_active = false));
-		models = models;
-		// Sync with server
-		await Promise.all(
-			modelsToDisable.map((model) => toggleModelById(localStorage.token, model.id))
-		);
+		await Promise.all(modelsToDisable.map((model) => setModelEnabledState(model, false, false)));
+		await syncModelsStore();
 	};
 
 	const downloadModels = async (models) => {
@@ -143,47 +301,18 @@
 		});
 	};
 
-	const upsertModelHandler = async (model) => {
-		model.base_model_id = null;
+	const upsertModelHandler = async (model, showSuccessToast = true) => {
+		const success = await persistModel(model, showSuccessToast);
+		if (!success) return false;
 
-		if (workspaceModels.find((m) => m.id === model.id)) {
-			const res = await updateModelById(localStorage.token, model.id, model).catch((error) => {
-				return null;
-			});
-
-			if (res) {
-				toast.success($i18n.t('Model updated successfully'));
-			}
-		} else {
-			const res = await createNewModel(localStorage.token, {
-				meta: {},
-				id: model.id,
-				name: model.name,
-				base_model_id: null,
-				params: {},
-				access_grants: [],
-				...model
-			}).catch((error) => {
-				return null;
-			});
-
-			if (res) {
-				toast.success($i18n.t('Model updated successfully'));
-			}
-		}
 		await init();
-
-		_models.set(
-			await getModels(
-				localStorage.token,
-				$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
-			)
-		);
+		await syncModelsStore();
+		return true;
 	};
 
-	const toggleModelHandler = async (model) => {
+	const toggleModelHandler = async (model, shouldSync = true) => {
 		if (!Object.keys(model).includes('base_model_id')) {
-			await createNewModel(localStorage.token, {
+			const res = await createNewModel(localStorage.token, {
 				id: model.id,
 				name: model.name,
 				base_model_id: null,
@@ -191,20 +320,234 @@
 				params: {},
 				access_grants: [],
 				is_active: model.is_active
-			}).catch((error) => {
+			}).catch(() => {
 				return null;
 			});
+
+			if (!res) {
+				return false;
+			}
 		} else {
-			await toggleModelById(localStorage.token, model.id);
+			const res = await toggleModelById(localStorage.token, model.id).catch(() => {
+				return null;
+			});
+
+			if (!res) {
+				return false;
+			}
 		}
 
-		// await init();
-		_models.set(
-			await getModels(
-				localStorage.token,
-				$config?.features?.enable_direct_connections && ($settings?.directConnections ?? null)
-			)
+		if (shouldSync) {
+			await syncModelsStore();
+		}
+
+		return true;
+	};
+
+	const setModelEnabledState = async (model, enabled: boolean, shouldSync = true) => {
+		const currentState = model?.is_active ?? true;
+		if (currentState === enabled) {
+			return true;
+		}
+
+		model.is_active = enabled;
+		return await toggleModelHandler(model, shouldSync);
+	};
+
+	const runBatchUpdate = async (handler: Function, successMessage: string) => {
+		if (batchActionInProgress || selectedModelIds.length === 0) {
+			return;
+		}
+
+		batchActionInProgress = true;
+
+		try {
+			const updatedCount = await handler();
+
+			if (updatedCount > 0) {
+				await init();
+				await syncModelsStore();
+				toast.success(successMessage);
+			}
+		} catch (error) {
+			toast.error(error?.detail ?? `${error}`);
+		} finally {
+			batchActionInProgress = false;
+		}
+	};
+
+	const batchEnableDisableHandler = async (enabled: boolean) => {
+		await runBatchUpdate(
+			async () => {
+				let updatedCount = 0;
+
+				for (const model of selectedModels()) {
+					const updated = await setModelEnabledState(model, enabled, false);
+					if (updated) {
+						updatedCount += 1;
+					}
+				}
+
+				return updatedCount;
+			},
+			enabled
+				? $i18n.t('Selected models enabled successfully')
+				: $i18n.t('Selected models disabled successfully')
 		);
+	};
+
+	const batchAccessGrants = () => {
+		if (batchAccessMode === 'public') {
+			return [
+				{
+					principal_type: 'user',
+					principal_id: '*',
+					permission: 'read'
+				}
+			];
+		}
+
+		if (batchAccessMode === 'group') {
+			if (!batchGroupId) {
+				return null;
+			}
+
+			return [
+				{
+					principal_type: 'group',
+					principal_id: batchGroupId,
+					permission: 'read'
+				}
+			];
+		}
+
+		return [];
+	};
+
+	const applyBatchAccess = async () => {
+		const grants = batchAccessGrants();
+		if (grants === null) {
+			toast.error($i18n.t('Select a group'));
+			return;
+		}
+
+		await runBatchUpdate(
+			async () => {
+				let updatedCount = 0;
+
+				for (const model of selectedModels()) {
+					model.access_grants = JSON.parse(JSON.stringify(grants));
+					const updated = await persistModel(model, false);
+					if (updated) {
+						updatedCount += 1;
+					}
+				}
+
+				return updatedCount;
+			},
+			$i18n.t('Selected models access updated successfully')
+		);
+	};
+
+	const applyBatchNameTemplate = async () => {
+		const template = batchNameTemplate.trim();
+		if (template === '') {
+			toast.error($i18n.t('Name template is required'));
+			return;
+		}
+
+		await runBatchUpdate(
+			async () => {
+				let updatedCount = 0;
+				for (const [index, model] of selectedModelsInDisplayOrder().entries()) {
+					const nextName = template
+						.replaceAll('{name}', model.name ?? model.id)
+						.replaceAll('{id}', model.id)
+						.replaceAll('{index}', `${index + 1}`)
+						.trim();
+
+					if (nextName === '' || nextName === model.name) {
+						continue;
+					}
+
+					model.name = nextName;
+					const updated = await persistModel(model, false);
+					if (updated) {
+						updatedCount += 1;
+					}
+				}
+
+				return updatedCount;
+			},
+			$i18n.t('Selected models renamed successfully')
+		);
+	};
+
+	const applyBatchIcon = async (profileImageUrl: string) => {
+		await runBatchUpdate(
+			async () => {
+				let updatedCount = 0;
+				for (const model of selectedModels()) {
+					model.meta = {
+						...model.meta,
+						profile_image_url: profileImageUrl
+					};
+
+					const updated = await persistModel(model, false);
+					if (updated) {
+						updatedCount += 1;
+					}
+				}
+
+				return updatedCount;
+			},
+			$i18n.t('Selected models icon updated successfully')
+		);
+	};
+
+	const uploadBatchIcon = async () => {
+		if (!batchIconPreviewUrl) {
+			toast.error($i18n.t('Select an icon'));
+			return;
+		}
+
+		await applyBatchIcon(batchIconPreviewUrl);
+	};
+
+	const fileToDataUrl = async (file: File) =>
+		await new Promise<string>((resolve, reject) => {
+			const reader = new FileReader();
+			reader.onload = (event) => {
+				resolve(String(event.target?.result ?? ''));
+			};
+			reader.onerror = () => {
+				reject(new Error('Failed to read file'));
+			};
+			reader.readAsDataURL(file);
+		});
+
+	const handleBatchIconChange = async () => {
+		const file = batchIconFiles?.[0];
+		if (!file) {
+			return;
+		}
+
+		try {
+			if (!file.type.startsWith('image/')) {
+				toast.error($i18n.t('Invalid file type'));
+				return;
+			}
+
+			const imageDataUrl = await fileToDataUrl(file);
+			batchIconPreviewUrl = imageDataUrl;
+		} catch (error) {
+			toast.error(error?.detail ?? `${error}`);
+		} finally {
+			batchIconFiles = null;
+			if (batchIconInputElement) {
+				batchIconInputElement.value = '';
+			}
+		}
 	};
 
 	const hideModelHandler = async (model) => {
@@ -225,7 +568,7 @@
 					})
 		);
 
-		upsertModelHandler(model);
+		await upsertModelHandler(model);
 	};
 
 	const copyLinkHandler = async (model) => {
@@ -269,8 +612,28 @@
 		await updateUserSettings(localStorage.token, { ui: $settings });
 	};
 
+	const openModelEditor = (modelId: string) => {
+		selectedModelId = modelId;
+	};
+
+	const onModelSave = async (model) => {
+		const updated = await upsertModelHandler(model);
+		if (!updated) return;
+
+		if (await closeWindowIfRequested()) {
+			return;
+		}
+
+		selectedModelId = null;
+	};
+
 	onMount(async () => {
 		await init();
+		groups = await getGroups(localStorage.token, true).catch((error) => {
+			console.error(error);
+			return [];
+		});
+
 		const id = $page.url.searchParams.get('id');
 
 		if (id) {
@@ -357,6 +720,16 @@
 									reader.readAsText(importFiles[0]);
 								}
 							}}
+						/>
+
+						<input
+							id="models-batch-icon-input"
+							bind:this={batchIconInputElement}
+							bind:files={batchIconFiles}
+							type="file"
+							accept="image/*"
+							hidden
+							on:change={handleBatchIconChange}
 						/>
 
 						<button
@@ -450,6 +823,18 @@
 
 				<div class="flex-1"></div>
 
+				<label
+					class="flex items-center gap-2 mr-2 px-2 py-1 rounded-lg text-xs text-gray-500 dark:text-gray-300 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-850 transition"
+				>
+					<input
+						type="checkbox"
+						class="size-3.5 rounded border-gray-300 dark:border-gray-700 bg-transparent"
+						checked={allFilteredSelected}
+						on:change={toggleSelectAllFilteredModels}
+					/>
+					{$i18n.t('Select All')}
+				</label>
+
 				<Dropdown>
 					<Tooltip content={$i18n.t('Actions')}>
 						<button
@@ -492,21 +877,194 @@
 				</Dropdown>
 			</div>
 
+			{#if selectedModelIds.length > 0}
+				<div class="px-3 mt-2">
+					<div
+						class="w-full rounded-2xl border border-gray-100 dark:border-gray-850 bg-gray-50/80 dark:bg-gray-900/50 px-3 py-2.5 flex flex-wrap items-center gap-2.5"
+					>
+						<div class="text-xs font-medium text-gray-500 dark:text-gray-300">
+							{selectedCountLabel}
+						</div>
+
+						<div class="h-4 w-px bg-gray-200 dark:bg-gray-800"></div>
+
+						<div class="flex items-center gap-1.5">
+							<button
+								class="text-xs px-2.5 py-1 rounded-lg bg-white hover:bg-gray-100 dark:bg-gray-850 dark:hover:bg-gray-800 transition disabled:opacity-60 disabled:cursor-not-allowed"
+								type="button"
+								disabled={batchActionInProgress}
+								on:click={() => {
+									batchEnableDisableHandler(true);
+								}}
+							>
+								{$i18n.t('Enable')}
+							</button>
+
+							<button
+								class="text-xs px-2.5 py-1 rounded-lg bg-white hover:bg-gray-100 dark:bg-gray-850 dark:hover:bg-gray-800 transition disabled:opacity-60 disabled:cursor-not-allowed"
+								type="button"
+								disabled={batchActionInProgress}
+								on:click={() => {
+									batchEnableDisableHandler(false);
+								}}
+							>
+								{$i18n.t('Disable')}
+							</button>
+						</div>
+
+						<div class="h-4 w-px bg-gray-200 dark:bg-gray-800"></div>
+
+						<div class="flex items-center gap-1.5">
+							<select
+								class="text-xs px-2 py-1 rounded-lg bg-white dark:bg-gray-850 border border-gray-100 dark:border-gray-800 outline-hidden"
+								bind:value={batchAccessMode}
+								disabled={batchActionInProgress}
+							>
+								<option value="private">{$i18n.t('Private')}</option>
+								<option value="public">{$i18n.t('Public')}</option>
+								<option value="group">{$i18n.t('Group')}</option>
+							</select>
+
+							{#if batchAccessMode === 'group'}
+								<select
+									class="text-xs px-2 py-1 rounded-lg bg-white dark:bg-gray-850 border border-gray-100 dark:border-gray-800 outline-hidden"
+									bind:value={batchGroupId}
+									disabled={batchActionInProgress}
+								>
+									{#if groups.length === 0}
+										<option value="">{$i18n.t('No groups found')}</option>
+									{:else}
+										{#each groups as group}
+											<option value={group.id}>{group.name}</option>
+										{/each}
+									{/if}
+								</select>
+							{/if}
+
+							<button
+								class="text-xs px-2.5 py-1 rounded-lg bg-white hover:bg-gray-100 dark:bg-gray-850 dark:hover:bg-gray-800 transition disabled:opacity-60 disabled:cursor-not-allowed"
+								type="button"
+								disabled={batchActionInProgress || (batchAccessMode === 'group' && !batchGroupId)}
+								on:click={applyBatchAccess}
+							>
+								{$i18n.t('Apply Access')}
+							</button>
+						</div>
+
+						<div class="h-4 w-px bg-gray-200 dark:bg-gray-800"></div>
+
+						<div class="flex items-center gap-1.5">
+							<button
+								class="size-8 rounded-lg overflow-hidden bg-white dark:bg-gray-850 border border-gray-100 dark:border-gray-800"
+								type="button"
+								on:click={() => {
+									batchIconInputElement?.click();
+								}}
+								aria-label={$i18n.t('Select Icon')}
+							>
+								<img
+									src={batchIconPreviewUrl || `${WEBUI_BASE_URL}/static/favicon.png`}
+									alt="batch icon preview"
+									class="size-full object-cover"
+								/>
+							</button>
+
+							<button
+								class="text-xs px-2.5 py-1 rounded-lg bg-white hover:bg-gray-100 dark:bg-gray-850 dark:hover:bg-gray-800 transition disabled:opacity-60 disabled:cursor-not-allowed"
+								type="button"
+								disabled={batchActionInProgress}
+								on:click={() => {
+									batchIconInputElement?.click();
+								}}
+							>
+								{$i18n.t('Select Icon')}
+							</button>
+
+							<button
+								class="text-xs px-2.5 py-1 rounded-lg bg-white hover:bg-gray-100 dark:bg-gray-850 dark:hover:bg-gray-800 transition disabled:opacity-60 disabled:cursor-not-allowed"
+								type="button"
+								disabled={batchActionInProgress || !batchIconPreviewUrl}
+								on:click={uploadBatchIcon}
+							>
+								{$i18n.t('Upload Icon')}
+							</button>
+						</div>
+
+						<div class="h-4 w-px bg-gray-200 dark:bg-gray-800"></div>
+
+						<div class="flex items-center gap-1.5">
+							<input
+								class="min-w-[180px] text-xs px-2 py-1 rounded-lg bg-white dark:bg-gray-850 border border-gray-100 dark:border-gray-800 outline-hidden"
+								type="text"
+								bind:value={batchNameTemplate}
+								placeholder={$i18n.t('Name template')}
+								disabled={batchActionInProgress}
+							/>
+
+							<button
+								class="text-xs px-2.5 py-1 rounded-lg bg-white hover:bg-gray-100 dark:bg-gray-850 dark:hover:bg-gray-800 transition disabled:opacity-60 disabled:cursor-not-allowed"
+								type="button"
+								disabled={batchActionInProgress || batchNameTemplate.trim() === ''}
+								on:click={applyBatchNameTemplate}
+							>
+								{$i18n.t('Set Name')}
+							</button>
+						</div>
+
+						<button
+							class="text-xs px-2 py-1 rounded-lg text-gray-600 hover:text-gray-800 dark:text-gray-300 dark:hover:text-white hover:bg-white dark:hover:bg-gray-850 transition ml-auto"
+							type="button"
+							on:click={clearSelection}
+						>
+							{$i18n.t('Clear')}
+						</button>
+					</div>
+				</div>
+			{/if}
+
 			<div class="px-3 my-2" id="model-list">
 				{#if filteredModels.length > 0}
 					{#each filteredModels.slice((currentPage - 1) * perPage, currentPage * perPage) as model, modelIdx (`${model.id}-${modelIdx}`)}
 						<div
-							class=" flex space-x-4 cursor-pointer w-full px-3 py-2 dark:hover:bg-white/5 hover:bg-black/5 rounded-xl transition {model
+							class=" flex gap-2 w-full px-2 py-2 dark:hover:bg-white/5 hover:bg-black/5 rounded-xl transition {model
 								?.meta?.hidden
 								? 'opacity-50 dark:opacity-50'
+								: ''} {selectedModelIds.includes(model.id)
+								? 'bg-black/[0.04] dark:bg-white/[0.06]'
 								: ''}"
 							id="model-item-{model.id}"
 						>
+							<div class="self-center shrink-0">
+								<input
+									type="checkbox"
+									class="size-4 rounded border-gray-300 dark:border-gray-700 bg-transparent"
+									checked={selectedModelIds.includes(model.id)}
+									on:click={(event) => {
+										const mouseEvent = event as MouseEvent;
+										event.stopPropagation();
+										setModelSelection(model.id, mouseEvent.shiftKey);
+									}}
+								/>
+							</div>
+
 							<button
 								class=" flex flex-1 text-left space-x-3.5 cursor-pointer w-full"
 								type="button"
 								on:click={() => {
-									selectedModelId = model.id;
+									openModelEditor(model.id);
+								}}
+								on:auxclick={(event) => {
+									const mouseEvent = event as MouseEvent;
+									if (mouseEvent.button === 1) {
+										event.preventDefault();
+										openModelEditorInNewTab(model.id);
+									}
+								}}
+								on:mousedown={(event) => {
+									const mouseEvent = event as MouseEvent;
+									if (mouseEvent.button === 1) {
+										event.preventDefault();
+									}
 								}}
 							>
 								<div class=" self-center w-9">
@@ -595,7 +1153,14 @@
 										class="self-center w-fit text-sm px-2 py-2 dark:text-gray-300 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-xl"
 										type="button"
 										on:click={() => {
-											selectedModelId = model.id;
+											openModelEditor(model.id);
+										}}
+										on:auxclick={(event) => {
+											const mouseEvent = event as MouseEvent;
+											if (mouseEvent.button === 1) {
+												event.preventDefault();
+												openModelEditorInNewTab(model.id);
+											}
 										}}
 									>
 										<svg
@@ -682,11 +1247,7 @@
 			edit
 			model={models.find((m) => m.id === selectedModelId)}
 			preset={false}
-			onSubmit={(model) => {
-				console.log(model);
-				upsertModelHandler(model);
-				selectedModelId = null;
-			}}
+			onSubmit={onModelSave}
 			onBack={async () => {
 				selectedModelId = null;
 				await init();

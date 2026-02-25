@@ -19,14 +19,15 @@
 	import Textarea from '$lib/components/common/Textarea.svelte';
 	import AccessControl from '../common/AccessControl.svelte';
 	import Spinner from '$lib/components/common/Spinner.svelte';
-	import XMark from '$lib/components/icons/XMark.svelte';
 	import DefaultFiltersSelector from './DefaultFiltersSelector.svelte';
 	import DefaultFeatures from './DefaultFeatures.svelte';
 	import BuiltinTools from './BuiltinTools.svelte';
 	import PromptSuggestions from './PromptSuggestions.svelte';
-	import AccessControlModal from '../common/AccessControlModal.svelte';
 	import LockClosed from '$lib/components/icons/LockClosed.svelte';
 	import { updateModelAccessGrants } from '$lib/apis/models';
+	import Dropdown from '$lib/components/common/Dropdown.svelte';
+	import { DropdownMenu } from 'bits-ui';
+	import { flyAndScale } from '$lib/utils/transitions';
 
 	const i18n = getContext('i18n');
 
@@ -46,7 +47,7 @@
 
 	let showAdvanced = false;
 	let showPreview = false;
-	let showAccessControlModal = false;
+	let showAccessControlDropdown = false;
 
 	let loaded = false;
 
@@ -102,6 +103,17 @@
 	let actionIds = [];
 	let accessGrants = [];
 	let tts = { voice: '' };
+
+	const onAccessControlChange = async () => {
+		if (edit && model?.id) {
+			try {
+				await updateModelAccessGrants(localStorage.token, model.id, model.name ?? name, accessGrants);
+				toast.success($i18n.t('Saved'));
+			} catch (error) {
+				toast.error(error?.detail ?? `${error}`);
+			}
+		}
+	};
 
 	const submitHandler = async () => {
 		loading = true;
@@ -326,29 +338,6 @@
 </script>
 
 {#if loaded}
-	<AccessControlModal
-		bind:show={showAccessControlModal}
-		bind:accessGrants
-		accessRoles={preset ? ['read', 'write'] : ['read']}
-		share={$user?.permissions?.sharing?.models || $user?.role === 'admin'}
-		sharePublic={$user?.permissions?.sharing?.public_models || $user?.role === 'admin'}
-		onChange={async () => {
-			if (edit && model?.id) {
-				try {
-					await updateModelAccessGrants(
-						localStorage.token,
-						model.id,
-						model.name ?? name,
-						accessGrants
-					);
-					toast.success($i18n.t('Saved'));
-				} catch (error) {
-					toast.error(error?.detail ?? `${error}`);
-				}
-			}
-		}}
-	/>
-
 	{#if onBack}
 		<button
 			class="flex space-x-1"
@@ -554,19 +543,39 @@
 								</div>
 
 								<div class="shrink-0">
-									<button
-										class="bg-gray-50 shrink-0 hover:bg-gray-100 text-black dark:bg-gray-850 dark:hover:bg-gray-800 dark:text-white transition px-2 py-1 rounded-full flex gap-1 items-center"
-										type="button"
-										on:click={() => {
-											showAccessControlModal = true;
-										}}
-									>
-										<LockClosed strokeWidth="2.5" className="size-3.5 shrink-0" />
+									<Dropdown bind:show={showAccessControlDropdown} align="end">
+										<button
+											class="bg-gray-50 shrink-0 hover:bg-gray-100 text-black dark:bg-gray-850 dark:hover:bg-gray-800 dark:text-white transition px-2 py-1 rounded-full flex gap-1 items-center"
+											type="button"
+										>
+											<LockClosed strokeWidth="2.5" className="size-3.5 shrink-0" />
 
-										<div class="text-sm font-medium shrink-0">
-											{$i18n.t('Access')}
+											<div class="text-sm font-medium shrink-0">
+												{$i18n.t('Access')}
+											</div>
+										</button>
+
+										<div slot="content">
+											<DropdownMenu.Content
+												class="w-[min(92vw,430px)] rounded-2xl p-2 border border-gray-100 dark:border-gray-800 z-50 bg-white dark:bg-gray-850 dark:text-white shadow-lg"
+												sideOffset={8}
+												side="bottom"
+												align="end"
+												transition={flyAndScale}
+											>
+												<div class="max-h-[65vh] overflow-y-auto px-2 py-1">
+													<AccessControl
+														bind:accessGrants
+														accessRoles={preset ? ['read', 'write'] : ['read']}
+														share={$user?.permissions?.sharing?.models || $user?.role === 'admin'}
+														sharePublic={$user?.permissions?.sharing?.public_models ||
+															$user?.role === 'admin'}
+														onChange={onAccessControlChange}
+													/>
+												</div>
+											</DropdownMenu.Content>
 										</div>
-									</button>
+									</Dropdown>
 								</div>
 							</div>
 
