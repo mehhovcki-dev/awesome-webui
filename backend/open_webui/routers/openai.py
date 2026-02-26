@@ -2,12 +2,19 @@ import asyncio
 import hashlib
 import json
 import logging
+import random
+from copy import deepcopy
 from typing import Optional
 from urllib.parse import urlparse
 
 import aiohttp
 from aiocache import cached
 import requests
+
+try:
+    from aiohttp_socks import ProxyConnector
+except ImportError:
+    ProxyConnector = None
 
 from azure.identity import DefaultAzureCredential, get_bearer_token_provider
 
@@ -69,10 +76,14 @@ log = logging.getLogger(__name__)
 ##########################################
 
 
-async def send_get_request(url, key=None, user: UserModel = None):
+async def send_get_request(url, key=None, user: UserModel = None, config: Optional[dict] = None):
     timeout = aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT_MODEL_LIST)
     try:
-        async with aiohttp.ClientSession(timeout=timeout, trust_env=True) as session:
+        session_proxy_kwargs, request_proxy = get_proxy_routing(config)
+
+        async with aiohttp.ClientSession(
+            timeout=timeout, trust_env=True, **session_proxy_kwargs
+        ) as session:
             headers = {
                 **({"Authorization": f"Bearer {key}"} if key else {}),
             }
@@ -80,10 +91,14 @@ async def send_get_request(url, key=None, user: UserModel = None):
             if ENABLE_FORWARD_USER_INFO_HEADERS and user:
                 headers = include_user_info_headers(headers, user)
 
+            if config and isinstance(config.get("headers"), dict):
+                headers = {**headers, **config.get("headers")}
+
             async with session.get(
                 url,
                 headers=headers,
                 ssl=AIOHTTP_CLIENT_SESSION_SSL,
+                **({"proxy": request_proxy} if request_proxy else {}),
             ) as response:
                 return await response.json()
     except Exception as e:
@@ -92,10 +107,12 @@ async def send_get_request(url, key=None, user: UserModel = None):
         return None
 
 
-async def get_models_request(url, key=None, user: UserModel = None):
+async def get_models_request(
+    url, key=None, user: UserModel = None, config: Optional[dict] = None
+):
     if is_anthropic_url(url):
         return await get_anthropic_models(url, key, user=user)
-    return await send_get_request(f"{url}/models", key, user=user)
+    return await send_get_request(f"{url}/models", key, user=user, config=config)
 
 
 def openai_reasoning_model_handler(payload):
@@ -117,6 +134,87 @@ def openai_reasoning_model_handler(payload):
             payload["messages"][0]["role"] = "developer"
 
     return payload
+
+
+def _deep_merge_dicts(base: dict, override: dict) -> dict:
+    merged = deepcopy(base)
+
+    for key, value in override.items():
+        existing_value = merged.get(key)
+        if isinstance(existing_value, dict) and isinstance(value, dict):
+            merged[key] = _deep_merge_dicts(existing_value, value)
+        else:
+            merged[key] = value
+
+    return merged
+
+
+def merge_additional_json_into_payload(payload: dict, config: Optional[dict]) -> dict:
+    if not isinstance(payload, dict):
+        return payload
+
+    additional_json = config.get("additional_json") if isinstance(config, dict) else None
+    if not isinstance(additional_json, dict):
+        return payload
+
+    # Merge configured JSON defaults while preserving request payload values.
+    return _deep_merge_dicts(additional_json, payload)
+
+
+def _normalize_proxy_entries(proxy_value) -> list[str]:
+    if isinstance(proxy_value, str):
+        stripped = proxy_value.strip()
+        return [stripped] if stripped else []
+
+    if isinstance(proxy_value, list):
+        normalized = []
+        for value in proxy_value:
+            if isinstance(value, str):
+                stripped = value.strip()
+                if stripped:
+                    normalized.append(stripped)
+        return normalized
+
+    return []
+
+
+def _resolve_proxy_url(config: Optional[dict]) -> Optional[str]:
+    if not isinstance(config, dict):
+        return None
+
+    proxy_entries = _normalize_proxy_entries(config.get("proxies", config.get("proxy")))
+    if not proxy_entries:
+        return None
+
+    proxy_type = str(config.get("proxy_type", "http")).lower()
+    if proxy_type not in ("http", "socks4", "socks5"):
+        proxy_type = "http"
+
+    selected_proxy = random.choice(proxy_entries)
+    parsed_proxy = urlparse(selected_proxy)
+    if parsed_proxy.scheme:
+        return selected_proxy
+
+    return f"{proxy_type}://{selected_proxy}"
+
+
+def get_proxy_routing(config: Optional[dict]) -> tuple[dict, Optional[str]]:
+    proxy_url = _resolve_proxy_url(config)
+    if not proxy_url:
+        return {}, None
+
+    proxy_scheme = urlparse(proxy_url).scheme.lower()
+    if proxy_scheme in ("http", "https"):
+        return {}, proxy_url
+
+    if proxy_scheme.startswith("socks"):
+        if ProxyConnector is None:
+            raise RuntimeError(
+                "SOCKS proxies require `aiohttp-socks`. Install it or switch this provider to an HTTP proxy."
+            )
+        return {"connector": ProxyConnector.from_url(proxy_url)}, None
+
+    raise RuntimeError(f"Unsupported proxy scheme: {proxy_scheme}")
 
 
 async def get_headers_and_cookies(
@@ -372,7 +470,9 @@ async def get_all_models_responses(request: Request, user: UserModel) -> list:
     request_tasks = []
     for idx, url in enumerate(api_base_urls):
         if (str(idx) not in api_configs) and (url not in api_configs):  # Legacy support
-            request_tasks.append(get_models_request(url, api_keys[idx], user=user))
+            request_tasks.append(
+                get_models_request(url, api_keys[idx], user=user, config={})
+            )
         else:
             api_config = api_configs.get(
                 str(idx),
@@ -385,7 +485,9 @@ async def get_all_models_responses(request: Request, user: UserModel) -> list:
             if enable:
                 if len(model_ids) == 0:
                     request_tasks.append(
-                        get_models_request(url, api_keys[idx], user=user)
+                        get_models_request(
+                            url, api_keys[idx], user=user, config=api_config
+                        )
                     )
                 else:
                     model_list = {
@@ -577,9 +679,11 @@ async def get_models(
         )
 
         r = None
+        session_proxy_kwargs, request_proxy = get_proxy_routing(api_config)
         async with aiohttp.ClientSession(
             trust_env=True,
             timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT_MODEL_LIST),
+            **session_proxy_kwargs,
         ) as session:
             try:
                 headers, cookies = await get_headers_and_cookies(
@@ -601,6 +705,7 @@ async def get_models(
                         headers=headers,
                         cookies=cookies,
                         ssl=AIOHTTP_CLIENT_SESSION_SSL,
+                        **({"proxy": request_proxy} if request_proxy else {}),
                     ) as r:
                         if r.status != 200:
                             error_detail = f"HTTP Error: {r.status}"
@@ -667,9 +772,11 @@ async def verify_connection(
 
     api_config = form_data.config or {}
 
+    session_proxy_kwargs, request_proxy = get_proxy_routing(api_config)
     async with aiohttp.ClientSession(
         trust_env=True,
         timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT_MODEL_LIST),
+        **session_proxy_kwargs,
     ) as session:
         try:
             headers, cookies = await get_headers_and_cookies(
@@ -688,6 +795,7 @@ async def verify_connection(
                     headers=headers,
                     cookies=cookies,
                     ssl=AIOHTTP_CLIENT_SESSION_SSL,
+                    **({"proxy": request_proxy} if request_proxy else {}),
                 ) as r:
                     try:
                         response_data = await r.json()
@@ -720,6 +828,7 @@ async def verify_connection(
                     headers=headers,
                     cookies=cookies,
                     ssl=AIOHTTP_CLIENT_SESSION_SSL,
+                    **({"proxy": request_proxy} if request_proxy else {}),
                 ) as r:
                     try:
                         response_data = await r.json()
@@ -1040,6 +1149,7 @@ async def generate_chat_completion(
 
     url = request.app.state.config.OPENAI_API_BASE_URLS[idx]
     key = request.app.state.config.OPENAI_API_KEYS[idx]
+    payload = merge_additional_json_into_payload(payload, api_config)
 
     # Check if model is a reasoning model that needs special handling
     if is_openai_reasoning_model(payload["model"]):
@@ -1097,8 +1207,11 @@ async def generate_chat_completion(
     response = None
 
     try:
+        session_proxy_kwargs, request_proxy = get_proxy_routing(api_config)
         session = aiohttp.ClientSession(
-            trust_env=True, timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT)
+            trust_env=True,
+            timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT),
+            **session_proxy_kwargs,
         )
 
         r = await session.request(
@@ -1108,6 +1221,7 @@ async def generate_chat_completion(
             headers=headers,
             cookies=cookies,
             ssl=AIOHTTP_CLIENT_SESSION_SSL,
+            **({"proxy": request_proxy} if request_proxy else {}),
         )
 
         # Check if response is SSE
@@ -1162,7 +1276,7 @@ async def embeddings(request: Request, form_data: dict, user):
     """
     idx = 0
     # Prepare payload/body
-    body = json.dumps(form_data)
+    payload = {**form_data}
     # Find correct backend url/key based on model
     model_id = form_data.get("model")
     # Check if model is already in app state cache to avoid expensive get_all_models() call
@@ -1179,6 +1293,8 @@ async def embeddings(request: Request, form_data: dict, user):
         str(idx),
         request.app.state.config.OPENAI_API_CONFIGS.get(url, {}),  # Legacy support
     )
+    payload = merge_additional_json_into_payload(payload, api_config)
+    body = json.dumps(payload)
 
     r = None
     session = None
@@ -1188,9 +1304,11 @@ async def embeddings(request: Request, form_data: dict, user):
         request, url, key, api_config, user=user
     )
     try:
+        session_proxy_kwargs, request_proxy = get_proxy_routing(api_config)
         session = aiohttp.ClientSession(
             trust_env=True,
             timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT),
+            **session_proxy_kwargs,
         )
         r = await session.request(
             method="POST",
@@ -1198,6 +1316,7 @@ async def embeddings(request: Request, form_data: dict, user):
             data=body,
             headers=headers,
             cookies=cookies,
+            **({"proxy": request_proxy} if request_proxy else {}),
         )
 
         if "text/event-stream" in r.headers.get("Content-Type", ""):
@@ -1264,7 +1383,6 @@ async def responses(
     Routes to the correct upstream backend based on the model field.
     """
     payload = form_data.model_dump(exclude_none=True)
-    body = json.dumps(payload)
 
     idx = 0
     model_id = form_data.model
@@ -1282,6 +1400,8 @@ async def responses(
         str(idx),
         request.app.state.config.OPENAI_API_CONFIGS.get(url, {}),  # Legacy support
     )
+    payload = merge_additional_json_into_payload(payload, api_config)
+    body = json.dumps(payload)
 
     r = None
     session = None
@@ -1308,9 +1428,11 @@ async def responses(
         else:
             request_url = f"{url}/responses"
 
+        session_proxy_kwargs, request_proxy = get_proxy_routing(api_config)
         session = aiohttp.ClientSession(
             trust_env=True,
             timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT),
+            **session_proxy_kwargs,
         )
         r = await session.request(
             method="POST",
@@ -1319,6 +1441,7 @@ async def responses(
             headers=headers,
             cookies=cookies,
             ssl=AIOHTTP_CLIENT_SESSION_SSL,
+            **({"proxy": request_proxy} if request_proxy else {}),
         )
 
         # Check if response is SSE
@@ -1390,6 +1513,9 @@ async def proxy(path: str, request: Request, user=Depends(get_verified_user)):
             request.app.state.config.OPENAI_API_BASE_URLS[idx], {}
         ),  # Legacy support
     )
+    if isinstance(payload, dict):
+        payload = merge_additional_json_into_payload(payload, api_config)
+        body = json.dumps(payload).encode()
 
     r = None
     session = None
@@ -1410,7 +1536,7 @@ async def proxy(path: str, request: Request, user=Depends(get_verified_user)):
 
             headers["api-version"] = api_version
 
-            payload = json.loads(body)
+            payload = payload if isinstance(payload, dict) else json.loads(body)
             url, payload = convert_to_azure_payload(url, payload, api_version)
             body = json.dumps(payload).encode()
 
@@ -1418,9 +1544,11 @@ async def proxy(path: str, request: Request, user=Depends(get_verified_user)):
         else:
             request_url = f"{url}/{path}"
 
+        session_proxy_kwargs, request_proxy = get_proxy_routing(api_config)
         session = aiohttp.ClientSession(
             trust_env=True,
             timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT),
+            **session_proxy_kwargs,
         )
         r = await session.request(
             method=request.method,
@@ -1429,6 +1557,7 @@ async def proxy(path: str, request: Request, user=Depends(get_verified_user)):
             headers=headers,
             cookies=cookies,
             ssl=AIOHTTP_CLIENT_SESSION_SSL,
+            **({"proxy": request_proxy} if request_proxy else {}),
         )
 
         # Check if response is SSE

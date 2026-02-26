@@ -10,7 +10,6 @@
 	import Modal from '$lib/components/common/Modal.svelte';
 	import Plus from '$lib/components/icons/Plus.svelte';
 	import Minus from '$lib/components/icons/Minus.svelte';
-	import PencilSolid from '$lib/components/icons/PencilSolid.svelte';
 	import SensitiveInput from '$lib/components/common/SensitiveInput.svelte';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import Switch from '$lib/components/common/Switch.svelte';
@@ -28,7 +27,7 @@
 	export let ollama = false;
 	export let direct = false;
 
-	export let connection = null;
+	export let connection: any = null;
 
 	let url = '';
 	let key = '';
@@ -45,13 +44,32 @@
 	let apiType = ''; // '' = chat completions (default), 'responses' = Responses API
 
 	let headers = '';
+	let additionalJson = '';
+	let proxyType = 'http';
+	let proxyInput = '';
+	let proxies: string[] = [];
 
-	let tags = [];
+	let tags: Array<{ name: string } | string> = [];
 
 	let modelId = '';
-	let modelIds = [];
+	let modelIds: string[] = [];
 
 	let loading = false;
+
+	const normalizeProxyList = (proxyList: unknown): string[] => {
+		if (typeof proxyList === 'string') {
+			const value = proxyList.trim();
+			return value ? [value] : [];
+		}
+
+		if (!Array.isArray(proxyList)) {
+			return [];
+		}
+
+		return proxyList
+			.map((proxy) => (typeof proxy === 'string' ? proxy.trim() : ''))
+			.filter(Boolean);
+	};
 
 	const verifyOllamaHandler = async () => {
 		// remove trailing slash from url
@@ -74,6 +92,8 @@
 		url = url.replace(/\/$/, '');
 
 		let _headers = null;
+		let _additionalJson = null;
+		const normalizedProxies = normalizeProxyList(proxies);
 
 		if (headers) {
 			try {
@@ -89,6 +109,24 @@
 			}
 		}
 
+		if (additionalJson) {
+			try {
+				_additionalJson = JSON.parse(additionalJson);
+				if (
+					typeof _additionalJson !== 'object' ||
+					Array.isArray(_additionalJson) ||
+					_additionalJson === null
+				) {
+					_additionalJson = null;
+					throw new Error('Additional JSON must be a valid JSON object');
+				}
+				additionalJson = JSON.stringify(_additionalJson, null, 2);
+			} catch (error) {
+				toast.error($i18n.t('Additional JSON must be a valid JSON object'));
+				return;
+			}
+		}
+
 		const res = await verifyOpenAIConnection(
 			localStorage.token,
 			{
@@ -98,7 +136,14 @@
 					auth_type,
 					azure: azure,
 					api_version: apiVersion,
-					...(_headers ? { headers: _headers } : {})
+					...(_headers ? { headers: _headers } : {}),
+					...(_additionalJson ? { additional_json: _additionalJson } : {}),
+					...(normalizedProxies.length > 0
+						? {
+								proxy_type: proxyType,
+								proxies: normalizedProxies
+							}
+						: {})
 				}
 			},
 			direct
@@ -123,6 +168,14 @@
 		if (modelId) {
 			modelIds = [...modelIds, modelId];
 			modelId = '';
+		}
+	};
+
+	const addProxyHandler = () => {
+		const trimmedProxy = proxyInput.trim();
+		if (trimmedProxy) {
+			proxies = [...proxies, trimmedProxy];
+			proxyInput = '';
 		}
 	};
 
@@ -166,9 +219,30 @@
 				headers = JSON.stringify(_headers, null, 2);
 			} catch (error) {
 				toast.error($i18n.t('Headers must be a valid JSON object'));
+				loading = false;
 				return;
 			}
 		}
+
+		if (additionalJson) {
+			try {
+				const _additionalJson = JSON.parse(additionalJson);
+				if (
+					typeof _additionalJson !== 'object' ||
+					Array.isArray(_additionalJson) ||
+					_additionalJson === null
+				) {
+					throw new Error('Additional JSON must be a valid JSON object');
+				}
+				additionalJson = JSON.stringify(_additionalJson, null, 2);
+			} catch (error) {
+				toast.error($i18n.t('Additional JSON must be a valid JSON object'));
+				loading = false;
+				return;
+			}
+		}
+
+		const normalizedProxies = normalizeProxyList(proxies);
 
 		// remove trailing slash from url
 		url = url.replace(/\/$/, '');
@@ -184,6 +258,13 @@
 				connection_type: connectionType,
 				auth_type,
 				headers: headers ? JSON.parse(headers) : undefined,
+				additional_json: additionalJson ? JSON.parse(additionalJson) : undefined,
+				...(normalizedProxies.length > 0
+					? {
+							proxy_type: proxyType,
+							proxies: normalizedProxies
+						}
+					: {}),
 				...(!ollama && azure ? { azure: true, api_version: apiVersion } : {}),
 				...(apiType ? { api_type: apiType } : {})
 			}
@@ -200,6 +281,11 @@
 		prefixId = '';
 		tags = [];
 		modelIds = [];
+		headers = '';
+		additionalJson = '';
+		proxyType = 'http';
+		proxyInput = '';
+		proxies = [];
 	};
 
 	const init = () => {
@@ -211,6 +297,14 @@
 			headers = connection.config?.headers
 				? JSON.stringify(connection.config.headers, null, 2)
 				: '';
+			additionalJson = connection.config?.additional_json
+				? JSON.stringify(connection.config.additional_json, null, 2)
+				: '';
+			proxyType = ['http', 'socks4', 'socks5'].includes(connection.config?.proxy_type)
+				? connection.config?.proxy_type
+				: 'http';
+			proxies = normalizeProxyList(connection.config?.proxies ?? connection.config?.proxy);
+			proxyInput = '';
 
 			enable = connection.config?.enable ?? true;
 			tags = connection.config?.tags ?? [];
@@ -225,6 +319,24 @@
 				apiVersion = connection.config?.api_version ?? '';
 				apiType = connection.config?.api_type ?? '';
 			}
+		} else {
+			url = '';
+			key = '';
+			auth_type = 'bearer';
+			enable = true;
+			connectionType = ollama ? 'local' : 'external';
+			azure = false;
+			apiVersion = '';
+			apiType = '';
+			headers = '';
+			additionalJson = '';
+			proxyType = 'http';
+			proxyInput = '';
+			proxies = [];
+			prefixId = '';
+			tags = [];
+			modelIds = [];
+			modelId = '';
 		}
 	};
 
@@ -453,6 +565,117 @@
 												minSize={30}
 											/>
 										</Tooltip>
+									</div>
+								</div>
+							</div>
+
+							<div class="flex gap-2 mt-2">
+								<div class="flex flex-col w-full">
+									<label
+										for="additional-json-input"
+										class={`mb-0.5 text-xs text-gray-500
+								${($settings?.highContrastMode ?? false) ? 'text-gray-800 dark:text-gray-100' : ''}`}
+										>{$i18n.t('Additional JSON')}</label
+									>
+
+									<div class="flex-1">
+										<Tooltip
+											content={$i18n.t(
+												'Enter additional request body fields in JSON format (merged into outgoing requests)'
+											)}
+										>
+											<Textarea
+												className="w-full text-sm outline-hidden"
+												bind:value={additionalJson}
+												placeholder={$i18n.t(
+													'Enter additional JSON object for request body'
+												)}
+												required={false}
+											/>
+										</Tooltip>
+									</div>
+								</div>
+							</div>
+
+							<div class="flex gap-2 mt-2">
+								<div class="flex flex-col w-full">
+									<label
+										for="proxy-type-input"
+										class={`mb-0.5 text-xs text-gray-500
+								${($settings?.highContrastMode ?? false) ? 'text-gray-800 dark:text-gray-100' : ''}`}
+										>{$i18n.t('Proxies')}</label
+									>
+
+									<div class="flex gap-2">
+										<div class="flex-shrink-0 self-start">
+											<select
+												id="proxy-type-input"
+												class={`dark:bg-gray-900 w-full text-sm bg-transparent pr-5 ${($settings?.highContrastMode ?? false) ? 'placeholder:text-gray-700 dark:placeholder:text-gray-100' : 'outline-hidden placeholder:text-gray-300 dark:placeholder:text-gray-700'}`}
+												bind:value={proxyType}
+											>
+												<option value="http">HTTP</option>
+												<option value="socks4">SOCKS4</option>
+												<option value="socks5">SOCKS5</option>
+											</select>
+										</div>
+
+										<div class="flex-1">
+											{#if proxies.length > 0}
+												<ul class="flex flex-col">
+													{#each proxies as proxyValue, proxyIdx}
+														<li class="flex gap-2 w-full justify-between items-center">
+															<div class="text-xs flex-1 py-1 rounded-lg break-all">
+																{proxyValue}
+															</div>
+															<div class="shrink-0">
+																<button
+																	aria-label={$i18n.t(`Remove proxy {{PROXY}} from list.`, {
+																		PROXY: proxyValue
+																	})}
+																	type="button"
+																	on:click={() => {
+																		proxies = proxies.filter((_, idx) => idx !== proxyIdx);
+																	}}
+																>
+																	<Minus strokeWidth="2" className="size-3.5" />
+																</button>
+															</div>
+														</li>
+													{/each}
+												</ul>
+											{:else}
+												<div
+													class={`text-gray-500 text-xs py-1
+												${($settings?.highContrastMode ?? false) ? 'text-gray-800 dark:text-gray-100' : ''}`}
+												>
+													{$i18n.t('Leave empty to use system/default proxy settings')}
+												</div>
+											{/if}
+
+											<div class="flex items-center mt-1">
+												<input
+													class="w-full py-1 text-sm rounded-lg bg-transparent {proxyInput
+														? ''
+														: 'text-gray-500'} {($settings?.highContrastMode ?? false)
+														? 'dark:placeholder:text-gray-100 placeholder:text-gray-700'
+														: 'placeholder:text-gray-300 dark:placeholder:text-gray-700 outline-hidden'}"
+													bind:value={proxyInput}
+													placeholder={$i18n.t('Add proxy endpoint (host:port or URL)')}
+												/>
+
+												<div>
+													<button
+														type="button"
+														aria-label={$i18n.t('Add')}
+														on:click={() => {
+															addProxyHandler();
+														}}
+													>
+														<Plus className="size-3.5" strokeWidth="2" />
+													</button>
+												</div>
+											</div>
+										</div>
 									</div>
 								</div>
 							</div>
