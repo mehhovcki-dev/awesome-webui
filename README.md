@@ -1,7 +1,7 @@
 ﻿# Awesome WebUI 👋
 >This `README.md` is also available in other languages:
 <br>\- 🇺🇸 English <small>[You are currently here!]</small>
-<br>\- 🇷🇺 [Русский](readme.ru.md)
+<br>\- 🇷🇺 [Русский](README.RU.MD)
 
 > "I wish using Open WebUI sucked a little less!"
 

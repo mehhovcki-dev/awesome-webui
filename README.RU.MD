@@ -6,7 +6,7 @@
 
 > "Как же хочется, чтобы пользоваться Open WebUI было чуть чуть удобнее!"
 
-Ну, я здесь как раз за этим. Awesome WebUI — это **fork** [Open WebUI](https://github.com/open-webui/open-webui), который стремится улучшить опыт использования как для администраторов, так и для обычных пользователей. Вместо долгих вступлений лучше сразу перейти к изменениям.
+Ну, я здесь как раз за этим. Awesome WebUI - это **fork** [Open WebUI](https://github.com/open-webui/open-webui), который стремится улучшить опыт использования как для администраторов, так и для обычных пользователей. Вместо долгих вступлений лучше сразу перейти к изменениям.
 <small>(да, обыграл название)</small>
 
 <small>
@@ -16,7 +16,7 @@
 # Список Изменений
 ## Админ-панель
 ### #1. Список моделей
-![model list showing openai models: gpt 5, gpt 5.1, gpt 5.2, codex](preview/image.png)
+![МНЕ ЛЕНЬ ЭТО ПЕРЕВОДИТЬ, поэтому model list showing openai models: gpt 5, gpt 5.1, gpt 5.2, codex](preview/image.png)
 ```diff
 + Добавлена возможность выделять сразу несколько моделей
 + Клик средней кнопкой мыши по модели открывает её редактор в новой вкладке
@@ -30,14 +30,14 @@
 <br>² - использование SOCKS-прокси добавляет зависимость: `aiohttp-socks`.
 </small>
 
-![preview of changes to the connections list](preview/image1.png)
+![МНЕ ЛЕНЬ ЭТО ПЕРЕВОДИТЬ, поэтому preview of changes to the connections list](preview/image1.png)
 ```diff
 + Интерфейс разделён на 3 секции (OpenAI, Ollama, Дополнительные настройки)
 + Кнопки выровнены и сгруппированы слева для более понятной навигации
 + Base URL у подключений сделан кликабельным
 + Добавлено отображение префикса и тегов для каждого подключения
 ```
-![preview of changes to the connections list](preview/image2.png)
+![МНЕ ЛЕНЬ ЭТО ПЕРЕВОДИТЬ, поэтому preview of changes to the connections list](preview/image2.png)
 ```diff
 + Добавлена поддержка прокси (HTTP/SOCKS4/SOCKS5) для подключений¹²
 + Добавлен «Дополнительный JSON», который добавляется к запросу
