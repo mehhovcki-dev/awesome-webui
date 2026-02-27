@@ -371,9 +371,20 @@ from open_webui.config import (
     JWT_EXPIRES_IN,
     ENABLE_SIGNUP,
     ENABLE_LOGIN_FORM,
+    ENABLE_PASSWORD_SIGNUP,
     ENABLE_API_KEYS,
     ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS,
     API_KEYS_ALLOWED_ENDPOINTS,
+    ENABLE_INVITE_ONLY_AUTH,
+    INVITE_CREATOR_SCOPE,
+    INVITE_CREATOR_GROUP_IDS,
+    INVITE_CREATOR_COOLDOWN_SECONDS,
+    INVITE_CODE_LENGTH,
+    INVITE_CODE_TTL_SECONDS,
+    INVITE_CODE_PREFIX,
+    INVITE_CODE_REUSABLE,
+    INVITE_CODE_MAX_USES,
+    INVITE_CODES,
     ENABLE_FOLDERS,
     FOLDER_MAX_FILE_COUNT,
     ENABLE_CHANNELS,
@@ -398,11 +409,70 @@ from open_webui.config import (
     DEFAULT_MODEL_PARAMS,
     EVALUATION_ARENA_MODELS,
     # WebUI (OAuth)
+    ENABLE_OAUTH_LOGIN,
+    ENABLE_OAUTH_SIGNUP,
+    OAUTH_MERGE_ACCOUNTS_BY_EMAIL,
+    OAUTH_TIMEOUT,
+    OAUTH_AUDIENCE,
+    GOOGLE_OAUTH_ENABLED,
+    GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET,
+    GOOGLE_OAUTH_SCOPE,
+    GOOGLE_SERVER_METADATA_URL,
+    GOOGLE_REDIRECT_URI,
+    MICROSOFT_OAUTH_ENABLED,
+    MICROSOFT_CLIENT_ID,
+    MICROSOFT_CLIENT_SECRET,
+    MICROSOFT_CLIENT_TENANT_ID,
+    MICROSOFT_CLIENT_LOGIN_BASE_URL,
+    MICROSOFT_CLIENT_PICTURE_URL,
+    MICROSOFT_OAUTH_SCOPE,
+    MICROSOFT_REDIRECT_URI,
+    GITHUB_OAUTH_ENABLED,
+    GITHUB_CLIENT_ID,
+    GITHUB_CLIENT_SECRET,
+    GITHUB_CLIENT_SCOPE,
+    GITHUB_CLIENT_REDIRECT_URI,
+    GITHUB_ACCESS_TOKEN_URL,
+    GITHUB_AUTHORIZE_URL,
+    GITHUB_API_BASE_URL,
+    GITHUB_USERINFO_ENDPOINT,
+    OIDC_OAUTH_ENABLED,
+    OAUTH_PROVIDER_NAME,
+    OAUTH_CLIENT_ID,
+    OAUTH_CLIENT_SECRET,
+    OPENID_PROVIDER_URL,
+    OPENID_REDIRECT_URI,
+    OAUTH_SCOPES,
+    OAUTH_TOKEN_ENDPOINT_AUTH_METHOD,
+    OAUTH_CODE_CHALLENGE_METHOD,
+    OAUTH_SUB_CLAIM,
+    OAUTH_GROUPS_CLAIM,
+    FEISHU_OAUTH_ENABLED,
+    FEISHU_CLIENT_ID,
+    FEISHU_CLIENT_SECRET,
+    FEISHU_OAUTH_SCOPE,
+    FEISHU_REDIRECT_URI,
+    FEISHU_ACCESS_TOKEN_URL,
+    FEISHU_AUTHORIZE_URL,
+    FEISHU_API_BASE_URL,
+    FEISHU_USERINFO_ENDPOINT,
+    DISCORD_OAUTH_ENABLED,
+    DISCORD_CLIENT_ID,
+    DISCORD_CLIENT_SECRET,
+    DISCORD_OAUTH_SCOPE,
+    DISCORD_REDIRECT_URI,
+    DISCORD_ACCESS_TOKEN_URL,
+    DISCORD_AUTHORIZE_URL,
+    DISCORD_API_BASE_URL,
+    DISCORD_USERINFO_ENDPOINT,
     ENABLE_OAUTH_ROLE_MANAGEMENT,
     OAUTH_ROLES_CLAIM,
     OAUTH_EMAIL_CLAIM,
     OAUTH_PICTURE_CLAIM,
     OAUTH_USERNAME_CLAIM,
+    OAUTH_ALLOWED_LOGIN_PROVIDERS,
+    OAUTH_ALLOWED_SIGNUP_PROVIDERS,
     OAUTH_ALLOWED_ROLES,
     OAUTH_ADMIN_ROLES,
     # WebUI (LDAP)
@@ -810,6 +880,7 @@ app.state.BASE_MODELS = []
 app.state.config.WEBUI_URL = WEBUI_URL
 app.state.config.ENABLE_SIGNUP = ENABLE_SIGNUP
 app.state.config.ENABLE_LOGIN_FORM = ENABLE_LOGIN_FORM
+app.state.config.ENABLE_PASSWORD_SIGNUP = ENABLE_PASSWORD_SIGNUP
 
 app.state.config.ENABLE_API_KEYS = ENABLE_API_KEYS
 app.state.config.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS = (
@@ -818,6 +889,17 @@ app.state.config.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS = (
 app.state.config.API_KEYS_ALLOWED_ENDPOINTS = API_KEYS_ALLOWED_ENDPOINTS
 
 app.state.config.JWT_EXPIRES_IN = JWT_EXPIRES_IN
+
+app.state.config.ENABLE_INVITE_ONLY_AUTH = ENABLE_INVITE_ONLY_AUTH
+app.state.config.INVITE_CREATOR_SCOPE = INVITE_CREATOR_SCOPE
+app.state.config.INVITE_CREATOR_GROUP_IDS = INVITE_CREATOR_GROUP_IDS
+app.state.config.INVITE_CREATOR_COOLDOWN_SECONDS = INVITE_CREATOR_COOLDOWN_SECONDS
+app.state.config.INVITE_CODE_LENGTH = INVITE_CODE_LENGTH
+app.state.config.INVITE_CODE_TTL_SECONDS = INVITE_CODE_TTL_SECONDS
+app.state.config.INVITE_CODE_PREFIX = INVITE_CODE_PREFIX
+app.state.config.INVITE_CODE_REUSABLE = INVITE_CODE_REUSABLE
+app.state.config.INVITE_CODE_MAX_USES = INVITE_CODE_MAX_USES
+app.state.config.INVITE_CODES = INVITE_CODES
 
 app.state.config.SHOW_ADMIN_DETAILS = SHOW_ADMIN_DETAILS
 app.state.config.ADMIN_EMAIL = ADMIN_EMAIL
@@ -874,6 +956,65 @@ if any("access_control" in m.get("meta", {}) for m in arena_models):
 app.state.config.OAUTH_USERNAME_CLAIM = OAUTH_USERNAME_CLAIM
 app.state.config.OAUTH_PICTURE_CLAIM = OAUTH_PICTURE_CLAIM
 app.state.config.OAUTH_EMAIL_CLAIM = OAUTH_EMAIL_CLAIM
+app.state.config.ENABLE_OAUTH_LOGIN = ENABLE_OAUTH_LOGIN
+app.state.config.ENABLE_OAUTH_SIGNUP = ENABLE_OAUTH_SIGNUP
+app.state.config.OAUTH_MERGE_ACCOUNTS_BY_EMAIL = OAUTH_MERGE_ACCOUNTS_BY_EMAIL
+app.state.config.OAUTH_TIMEOUT = OAUTH_TIMEOUT
+app.state.config.OAUTH_AUDIENCE = OAUTH_AUDIENCE
+app.state.config.GOOGLE_OAUTH_ENABLED = GOOGLE_OAUTH_ENABLED
+app.state.config.GOOGLE_CLIENT_ID = GOOGLE_CLIENT_ID
+app.state.config.GOOGLE_CLIENT_SECRET = GOOGLE_CLIENT_SECRET
+app.state.config.GOOGLE_OAUTH_SCOPE = GOOGLE_OAUTH_SCOPE
+app.state.config.GOOGLE_SERVER_METADATA_URL = GOOGLE_SERVER_METADATA_URL
+app.state.config.GOOGLE_REDIRECT_URI = GOOGLE_REDIRECT_URI
+app.state.config.MICROSOFT_OAUTH_ENABLED = MICROSOFT_OAUTH_ENABLED
+app.state.config.MICROSOFT_CLIENT_ID = MICROSOFT_CLIENT_ID
+app.state.config.MICROSOFT_CLIENT_SECRET = MICROSOFT_CLIENT_SECRET
+app.state.config.MICROSOFT_CLIENT_TENANT_ID = MICROSOFT_CLIENT_TENANT_ID
+app.state.config.MICROSOFT_CLIENT_LOGIN_BASE_URL = MICROSOFT_CLIENT_LOGIN_BASE_URL
+app.state.config.MICROSOFT_CLIENT_PICTURE_URL = MICROSOFT_CLIENT_PICTURE_URL
+app.state.config.MICROSOFT_OAUTH_SCOPE = MICROSOFT_OAUTH_SCOPE
+app.state.config.MICROSOFT_REDIRECT_URI = MICROSOFT_REDIRECT_URI
+app.state.config.GITHUB_OAUTH_ENABLED = GITHUB_OAUTH_ENABLED
+app.state.config.GITHUB_CLIENT_ID = GITHUB_CLIENT_ID
+app.state.config.GITHUB_CLIENT_SECRET = GITHUB_CLIENT_SECRET
+app.state.config.GITHUB_CLIENT_SCOPE = GITHUB_CLIENT_SCOPE
+app.state.config.GITHUB_CLIENT_REDIRECT_URI = GITHUB_CLIENT_REDIRECT_URI
+app.state.config.GITHUB_ACCESS_TOKEN_URL = GITHUB_ACCESS_TOKEN_URL
+app.state.config.GITHUB_AUTHORIZE_URL = GITHUB_AUTHORIZE_URL
+app.state.config.GITHUB_API_BASE_URL = GITHUB_API_BASE_URL
+app.state.config.GITHUB_USERINFO_ENDPOINT = GITHUB_USERINFO_ENDPOINT
+app.state.config.OIDC_OAUTH_ENABLED = OIDC_OAUTH_ENABLED
+app.state.config.OAUTH_PROVIDER_NAME = OAUTH_PROVIDER_NAME
+app.state.config.OAUTH_CLIENT_ID = OAUTH_CLIENT_ID
+app.state.config.OAUTH_CLIENT_SECRET = OAUTH_CLIENT_SECRET
+app.state.config.OPENID_PROVIDER_URL = OPENID_PROVIDER_URL
+app.state.config.OPENID_REDIRECT_URI = OPENID_REDIRECT_URI
+app.state.config.OAUTH_SCOPES = OAUTH_SCOPES
+app.state.config.OAUTH_TOKEN_ENDPOINT_AUTH_METHOD = OAUTH_TOKEN_ENDPOINT_AUTH_METHOD
+app.state.config.OAUTH_CODE_CHALLENGE_METHOD = OAUTH_CODE_CHALLENGE_METHOD
+app.state.config.OAUTH_SUB_CLAIM = OAUTH_SUB_CLAIM
+app.state.config.OAUTH_GROUPS_CLAIM = OAUTH_GROUPS_CLAIM
+app.state.config.FEISHU_OAUTH_ENABLED = FEISHU_OAUTH_ENABLED
+app.state.config.FEISHU_CLIENT_ID = FEISHU_CLIENT_ID
+app.state.config.FEISHU_CLIENT_SECRET = FEISHU_CLIENT_SECRET
+app.state.config.FEISHU_OAUTH_SCOPE = FEISHU_OAUTH_SCOPE
+app.state.config.FEISHU_REDIRECT_URI = FEISHU_REDIRECT_URI
+app.state.config.FEISHU_ACCESS_TOKEN_URL = FEISHU_ACCESS_TOKEN_URL
+app.state.config.FEISHU_AUTHORIZE_URL = FEISHU_AUTHORIZE_URL
+app.state.config.FEISHU_API_BASE_URL = FEISHU_API_BASE_URL
+app.state.config.FEISHU_USERINFO_ENDPOINT = FEISHU_USERINFO_ENDPOINT
+app.state.config.DISCORD_OAUTH_ENABLED = DISCORD_OAUTH_ENABLED
+app.state.config.DISCORD_CLIENT_ID = DISCORD_CLIENT_ID
+app.state.config.DISCORD_CLIENT_SECRET = DISCORD_CLIENT_SECRET
+app.state.config.DISCORD_OAUTH_SCOPE = DISCORD_OAUTH_SCOPE
+app.state.config.DISCORD_REDIRECT_URI = DISCORD_REDIRECT_URI
+app.state.config.DISCORD_ACCESS_TOKEN_URL = DISCORD_ACCESS_TOKEN_URL
+app.state.config.DISCORD_AUTHORIZE_URL = DISCORD_AUTHORIZE_URL
+app.state.config.DISCORD_API_BASE_URL = DISCORD_API_BASE_URL
+app.state.config.DISCORD_USERINFO_ENDPOINT = DISCORD_USERINFO_ENDPOINT
+app.state.config.OAUTH_ALLOWED_LOGIN_PROVIDERS = OAUTH_ALLOWED_LOGIN_PROVIDERS
+app.state.config.OAUTH_ALLOWED_SIGNUP_PROVIDERS = OAUTH_ALLOWED_SIGNUP_PROVIDERS
 
 app.state.config.ENABLE_OAUTH_ROLE_MANAGEMENT = ENABLE_OAUTH_ROLE_MANAGEMENT
 app.state.config.OAUTH_ROLES_CLAIM = OAUTH_ROLES_CLAIM
@@ -2102,6 +2243,27 @@ async def get_app_config(request: Request):
     if user is None:
         onboarding = user_count == 0
 
+    configured_oauth_providers = list(OAUTH_PROVIDERS.keys())
+    raw_allowed_login_providers = app.state.config.OAUTH_ALLOWED_LOGIN_PROVIDERS
+    if isinstance(raw_allowed_login_providers, list):
+        allowed_login_providers = [
+            provider
+            for provider in [str(provider).strip().lower() for provider in raw_allowed_login_providers]
+            if provider in configured_oauth_providers
+        ]
+    else:
+        allowed_login_providers = configured_oauth_providers
+
+    raw_allowed_signup_providers = app.state.config.OAUTH_ALLOWED_SIGNUP_PROVIDERS
+    if isinstance(raw_allowed_signup_providers, list):
+        allowed_signup_providers = [
+            provider
+            for provider in [str(provider).strip().lower() for provider in raw_allowed_signup_providers]
+            if provider in configured_oauth_providers
+        ]
+    else:
+        allowed_signup_providers = configured_oauth_providers
+
     return {
         **({"onboarding": True} if onboarding else {}),
         "status": True,
@@ -2112,7 +2274,9 @@ async def get_app_config(request: Request):
             "providers": {
                 name: config.get("name", name)
                 for name, config in OAUTH_PROVIDERS.items()
-            }
+            },
+            "allowed_login_providers": allowed_login_providers,
+            "allowed_signup_providers": allowed_signup_providers,
         },
         "features": {
             "auth": WEBUI_AUTH,
@@ -2122,6 +2286,10 @@ async def get_app_config(request: Request):
             "enable_api_keys": app.state.config.ENABLE_API_KEYS,
             "enable_signup": app.state.config.ENABLE_SIGNUP,
             "enable_login_form": app.state.config.ENABLE_LOGIN_FORM,
+            "enable_password_signup": app.state.config.ENABLE_PASSWORD_SIGNUP,
+            "enable_oauth_login": app.state.config.ENABLE_OAUTH_LOGIN,
+            "enable_oauth_signup": app.state.config.ENABLE_OAUTH_SIGNUP,
+            "enable_invite_only_auth": app.state.config.ENABLE_INVITE_ONLY_AUTH,
             "enable_websocket": ENABLE_WEBSOCKET_SUPPORT,
             "enable_version_update_check": ENABLE_VERSION_UPDATE_CHECK,
             "enable_public_active_users_count": ENABLE_PUBLIC_ACTIVE_USERS_COUNT,
@@ -2501,7 +2669,7 @@ async def oauth_client_callback(
 
 @app.get("/oauth/{provider}/login")
 async def oauth_login(provider: str, request: Request):
-    return await oauth_manager.handle_login(request, provider)
+    return await request.app.state.oauth_manager.handle_login(request, provider)
 
 
 # OAuth login logic is as follows:
@@ -2518,7 +2686,9 @@ async def oauth_login_callback(
     response: Response,
     db: Session = Depends(get_session),
 ):
-    return await oauth_manager.handle_callback(request, provider, response, db=db)
+    return await request.app.state.oauth_manager.handle_callback(
+        request, provider, response, db=db
+    )
 
 
 @app.get("/manifest.json")

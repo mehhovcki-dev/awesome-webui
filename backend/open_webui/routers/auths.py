@@ -46,13 +46,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import RedirectResponse, Response, JSONResponse
 from open_webui.config import (
     OPENID_PROVIDER_URL,
-    ENABLE_OAUTH_SIGNUP,
     ENABLE_LDAP,
     ENABLE_PASSWORD_AUTH,
     OAUTH_PROVIDERS,
     OAUTH_MERGE_ACCOUNTS_BY_EMAIL,
+    load_oauth_providers,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from open_webui.utils.misc import parse_duration, validate_email_format
 from open_webui.utils.auth import (
@@ -73,6 +73,14 @@ from sqlalchemy.orm import Session
 from open_webui.utils.webhook import post_webhook
 from open_webui.utils.access_control import get_permissions, has_permission
 from open_webui.utils.groups import apply_default_group_assignment
+from open_webui.utils.invites import (
+    can_user_create_invite_codes,
+    consume_invite_code,
+    create_invite_code,
+    get_clean_invite_codes,
+    get_invite_codes_for_user,
+)
+from open_webui.utils.oauth import OAuthManager
 
 from open_webui.utils.redis import get_redis_client
 from open_webui.utils.rate_limit import RateLimiter
@@ -92,6 +100,151 @@ log = logging.getLogger(__name__)
 signin_rate_limiter = RateLimiter(
     redis_client=get_redis_client(), limit=5 * 3, window=60 * 3
 )
+
+
+def _sanitize_oauth_provider_list(provider_list):
+    if provider_list is None:
+        return None
+
+    if not isinstance(provider_list, list):
+        return []
+
+    configured_providers = set(OAUTH_PROVIDERS.keys())
+    sanitized = []
+    for provider in provider_list:
+        normalized = str(provider).strip().lower()
+        if not normalized or normalized not in configured_providers:
+            continue
+        if normalized not in sanitized:
+            sanitized.append(normalized)
+    return sanitized
+
+
+def _sanitize_text(value, max_length: int | None = None) -> str:
+    text = str(value or "").strip()
+    if max_length is not None:
+        return text[:max_length]
+    return text
+
+
+def _sanitize_oauth_timeout(value) -> str:
+    text = _sanitize_text(value, 16)
+    if not text:
+        return ""
+    return text if text.isdigit() else ""
+
+
+def _sanitize_oauth_code_challenge_method(value) -> str | None:
+    text = _sanitize_text(value, 16).upper()
+    if text in ["", "NONE"]:
+        return None
+    if text == "S256":
+        return text
+    return None
+
+
+def _reload_oauth_runtime(request: Request):
+    load_oauth_providers()
+    request.app.state.oauth_manager = OAuthManager(request.app)
+
+
+def _serialize_admin_config(request: Request) -> dict:
+    return {
+        "SHOW_ADMIN_DETAILS": request.app.state.config.SHOW_ADMIN_DETAILS,
+        "ADMIN_EMAIL": request.app.state.config.ADMIN_EMAIL,
+        "WEBUI_URL": request.app.state.config.WEBUI_URL,
+        "ENABLE_SIGNUP": request.app.state.config.ENABLE_SIGNUP,
+        "ENABLE_PASSWORD_SIGNUP": request.app.state.config.ENABLE_PASSWORD_SIGNUP,
+        "ENABLE_OAUTH_LOGIN": request.app.state.config.ENABLE_OAUTH_LOGIN,
+        "ENABLE_OAUTH_SIGNUP": request.app.state.config.ENABLE_OAUTH_SIGNUP,
+        "OAUTH_ALLOWED_LOGIN_PROVIDERS": request.app.state.config.OAUTH_ALLOWED_LOGIN_PROVIDERS,
+        "OAUTH_ALLOWED_SIGNUP_PROVIDERS": request.app.state.config.OAUTH_ALLOWED_SIGNUP_PROVIDERS,
+        "OAUTH_MERGE_ACCOUNTS_BY_EMAIL": request.app.state.config.OAUTH_MERGE_ACCOUNTS_BY_EMAIL,
+        "OAUTH_TIMEOUT": request.app.state.config.OAUTH_TIMEOUT,
+        "OAUTH_AUDIENCE": request.app.state.config.OAUTH_AUDIENCE,
+        "GOOGLE_OAUTH_ENABLED": request.app.state.config.GOOGLE_OAUTH_ENABLED,
+        "GOOGLE_CLIENT_ID": request.app.state.config.GOOGLE_CLIENT_ID,
+        "GOOGLE_CLIENT_SECRET": request.app.state.config.GOOGLE_CLIENT_SECRET,
+        "GOOGLE_OAUTH_SCOPE": request.app.state.config.GOOGLE_OAUTH_SCOPE,
+        "GOOGLE_SERVER_METADATA_URL": request.app.state.config.GOOGLE_SERVER_METADATA_URL,
+        "GOOGLE_REDIRECT_URI": request.app.state.config.GOOGLE_REDIRECT_URI,
+        "MICROSOFT_OAUTH_ENABLED": request.app.state.config.MICROSOFT_OAUTH_ENABLED,
+        "MICROSOFT_CLIENT_ID": request.app.state.config.MICROSOFT_CLIENT_ID,
+        "MICROSOFT_CLIENT_SECRET": request.app.state.config.MICROSOFT_CLIENT_SECRET,
+        "MICROSOFT_CLIENT_TENANT_ID": request.app.state.config.MICROSOFT_CLIENT_TENANT_ID,
+        "MICROSOFT_CLIENT_LOGIN_BASE_URL": request.app.state.config.MICROSOFT_CLIENT_LOGIN_BASE_URL,
+        "MICROSOFT_CLIENT_PICTURE_URL": request.app.state.config.MICROSOFT_CLIENT_PICTURE_URL,
+        "MICROSOFT_OAUTH_SCOPE": request.app.state.config.MICROSOFT_OAUTH_SCOPE,
+        "MICROSOFT_REDIRECT_URI": request.app.state.config.MICROSOFT_REDIRECT_URI,
+        "GITHUB_OAUTH_ENABLED": request.app.state.config.GITHUB_OAUTH_ENABLED,
+        "GITHUB_CLIENT_ID": request.app.state.config.GITHUB_CLIENT_ID,
+        "GITHUB_CLIENT_SECRET": request.app.state.config.GITHUB_CLIENT_SECRET,
+        "GITHUB_CLIENT_SCOPE": request.app.state.config.GITHUB_CLIENT_SCOPE,
+        "GITHUB_CLIENT_REDIRECT_URI": request.app.state.config.GITHUB_CLIENT_REDIRECT_URI,
+        "GITHUB_ACCESS_TOKEN_URL": request.app.state.config.GITHUB_ACCESS_TOKEN_URL,
+        "GITHUB_AUTHORIZE_URL": request.app.state.config.GITHUB_AUTHORIZE_URL,
+        "GITHUB_API_BASE_URL": request.app.state.config.GITHUB_API_BASE_URL,
+        "GITHUB_USERINFO_ENDPOINT": request.app.state.config.GITHUB_USERINFO_ENDPOINT,
+        "OIDC_OAUTH_ENABLED": request.app.state.config.OIDC_OAUTH_ENABLED,
+        "OAUTH_PROVIDER_NAME": request.app.state.config.OAUTH_PROVIDER_NAME,
+        "OAUTH_CLIENT_ID": request.app.state.config.OAUTH_CLIENT_ID,
+        "OAUTH_CLIENT_SECRET": request.app.state.config.OAUTH_CLIENT_SECRET,
+        "OPENID_PROVIDER_URL": request.app.state.config.OPENID_PROVIDER_URL,
+        "OPENID_REDIRECT_URI": request.app.state.config.OPENID_REDIRECT_URI,
+        "OAUTH_SCOPES": request.app.state.config.OAUTH_SCOPES,
+        "OAUTH_TOKEN_ENDPOINT_AUTH_METHOD": request.app.state.config.OAUTH_TOKEN_ENDPOINT_AUTH_METHOD,
+        "OAUTH_CODE_CHALLENGE_METHOD": request.app.state.config.OAUTH_CODE_CHALLENGE_METHOD,
+        "OAUTH_SUB_CLAIM": request.app.state.config.OAUTH_SUB_CLAIM,
+        "OAUTH_USERNAME_CLAIM": request.app.state.config.OAUTH_USERNAME_CLAIM,
+        "OAUTH_EMAIL_CLAIM": request.app.state.config.OAUTH_EMAIL_CLAIM,
+        "OAUTH_PICTURE_CLAIM": request.app.state.config.OAUTH_PICTURE_CLAIM,
+        "OAUTH_GROUPS_CLAIM": request.app.state.config.OAUTH_GROUPS_CLAIM,
+        "FEISHU_OAUTH_ENABLED": request.app.state.config.FEISHU_OAUTH_ENABLED,
+        "FEISHU_CLIENT_ID": request.app.state.config.FEISHU_CLIENT_ID,
+        "FEISHU_CLIENT_SECRET": request.app.state.config.FEISHU_CLIENT_SECRET,
+        "FEISHU_OAUTH_SCOPE": request.app.state.config.FEISHU_OAUTH_SCOPE,
+        "FEISHU_REDIRECT_URI": request.app.state.config.FEISHU_REDIRECT_URI,
+        "FEISHU_ACCESS_TOKEN_URL": request.app.state.config.FEISHU_ACCESS_TOKEN_URL,
+        "FEISHU_AUTHORIZE_URL": request.app.state.config.FEISHU_AUTHORIZE_URL,
+        "FEISHU_API_BASE_URL": request.app.state.config.FEISHU_API_BASE_URL,
+        "FEISHU_USERINFO_ENDPOINT": request.app.state.config.FEISHU_USERINFO_ENDPOINT,
+        "DISCORD_OAUTH_ENABLED": request.app.state.config.DISCORD_OAUTH_ENABLED,
+        "DISCORD_CLIENT_ID": request.app.state.config.DISCORD_CLIENT_ID,
+        "DISCORD_CLIENT_SECRET": request.app.state.config.DISCORD_CLIENT_SECRET,
+        "DISCORD_OAUTH_SCOPE": request.app.state.config.DISCORD_OAUTH_SCOPE,
+        "DISCORD_REDIRECT_URI": request.app.state.config.DISCORD_REDIRECT_URI,
+        "DISCORD_ACCESS_TOKEN_URL": request.app.state.config.DISCORD_ACCESS_TOKEN_URL,
+        "DISCORD_AUTHORIZE_URL": request.app.state.config.DISCORD_AUTHORIZE_URL,
+        "DISCORD_API_BASE_URL": request.app.state.config.DISCORD_API_BASE_URL,
+        "DISCORD_USERINFO_ENDPOINT": request.app.state.config.DISCORD_USERINFO_ENDPOINT,
+        "ENABLE_INVITE_ONLY_AUTH": request.app.state.config.ENABLE_INVITE_ONLY_AUTH,
+        "INVITE_CREATOR_SCOPE": request.app.state.config.INVITE_CREATOR_SCOPE,
+        "INVITE_CREATOR_GROUP_IDS": request.app.state.config.INVITE_CREATOR_GROUP_IDS,
+        "INVITE_CREATOR_COOLDOWN_SECONDS": request.app.state.config.INVITE_CREATOR_COOLDOWN_SECONDS,
+        "INVITE_CODE_LENGTH": request.app.state.config.INVITE_CODE_LENGTH,
+        "INVITE_CODE_TTL_SECONDS": request.app.state.config.INVITE_CODE_TTL_SECONDS,
+        "INVITE_CODE_PREFIX": request.app.state.config.INVITE_CODE_PREFIX,
+        "INVITE_CODE_REUSABLE": request.app.state.config.INVITE_CODE_REUSABLE,
+        "INVITE_CODE_MAX_USES": request.app.state.config.INVITE_CODE_MAX_USES,
+        "ENABLE_API_KEYS": request.app.state.config.ENABLE_API_KEYS,
+        "ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS": request.app.state.config.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS,
+        "API_KEYS_ALLOWED_ENDPOINTS": request.app.state.config.API_KEYS_ALLOWED_ENDPOINTS,
+        "DEFAULT_USER_ROLE": request.app.state.config.DEFAULT_USER_ROLE,
+        "DEFAULT_GROUP_ID": request.app.state.config.DEFAULT_GROUP_ID,
+        "JWT_EXPIRES_IN": request.app.state.config.JWT_EXPIRES_IN,
+        "ENABLE_COMMUNITY_SHARING": request.app.state.config.ENABLE_COMMUNITY_SHARING,
+        "ENABLE_MESSAGE_RATING": request.app.state.config.ENABLE_MESSAGE_RATING,
+        "ENABLE_FOLDERS": request.app.state.config.ENABLE_FOLDERS,
+        "FOLDER_MAX_FILE_COUNT": request.app.state.config.FOLDER_MAX_FILE_COUNT,
+        "ENABLE_CHANNELS": request.app.state.config.ENABLE_CHANNELS,
+        "ENABLE_MEMORIES": request.app.state.config.ENABLE_MEMORIES,
+        "ENABLE_NOTES": request.app.state.config.ENABLE_NOTES,
+        "ENABLE_USER_WEBHOOKS": request.app.state.config.ENABLE_USER_WEBHOOKS,
+        "ENABLE_USER_STATUS": request.app.state.config.ENABLE_USER_STATUS,
+        "PENDING_USER_OVERLAY_TITLE": request.app.state.config.PENDING_USER_OVERLAY_TITLE,
+        "PENDING_USER_OVERLAY_CONTENT": request.app.state.config.PENDING_USER_OVERLAY_CONTENT,
+        "RESPONSE_WATERMARK": request.app.state.config.RESPONSE_WATERMARK,
+    }
 
 
 def create_session_response(
@@ -164,6 +317,7 @@ class SessionUserInfoResponse(SessionUserResponse, UserStatus):
     bio: Optional[str] = None
     gender: Optional[str] = None
     date_of_birth: Optional[datetime.date] = None
+    oauth: Optional[dict] = None
 
 
 @router.get("/", response_model=SessionUserInfoResponse)
@@ -220,6 +374,7 @@ async def get_session_user(
         "bio": user.bio,
         "gender": user.gender,
         "date_of_birth": user.date_of_birth,
+        "oauth": user.oauth,
         "status_emoji": user.status_emoji,
         "status_message": user.status_message,
         "status_expires_at": user.status_expires_at,
@@ -762,6 +917,12 @@ async def signup(
                 raise HTTPException(
                     status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.ACCESS_PROHIBITED
                 )
+
+        if not request.app.state.config.ENABLE_PASSWORD_SIGNUP:
+            if has_users or not ENABLE_INITIAL_ADMIN_SIGNUP:
+                raise HTTPException(
+                    status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.ACCESS_PROHIBITED
+                )
     else:
         if has_users:
             raise HTTPException(
@@ -781,6 +942,15 @@ async def signup(
             validate_password(form_data.password)
         except Exception as e:
             raise HTTPException(400, detail=str(e))
+
+        if request.app.state.config.ENABLE_INVITE_ONLY_AUTH and has_users:
+            valid_invite, invite_error, _ = consume_invite_code(
+                request.app.state.config,
+                form_data.invite_code,
+                consumed_by=form_data.email.lower(),
+            )
+            if not valid_invite:
+                raise HTTPException(400, detail=invite_error)
 
         user = await signup_handler(
             request,
@@ -983,30 +1153,70 @@ async def get_admin_details(
 
 @router.get("/admin/config")
 async def get_admin_config(request: Request, user=Depends(get_admin_user)):
-    return {
-        "SHOW_ADMIN_DETAILS": request.app.state.config.SHOW_ADMIN_DETAILS,
-        "ADMIN_EMAIL": request.app.state.config.ADMIN_EMAIL,
-        "WEBUI_URL": request.app.state.config.WEBUI_URL,
-        "ENABLE_SIGNUP": request.app.state.config.ENABLE_SIGNUP,
-        "ENABLE_API_KEYS": request.app.state.config.ENABLE_API_KEYS,
-        "ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS": request.app.state.config.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS,
-        "API_KEYS_ALLOWED_ENDPOINTS": request.app.state.config.API_KEYS_ALLOWED_ENDPOINTS,
-        "DEFAULT_USER_ROLE": request.app.state.config.DEFAULT_USER_ROLE,
-        "DEFAULT_GROUP_ID": request.app.state.config.DEFAULT_GROUP_ID,
-        "JWT_EXPIRES_IN": request.app.state.config.JWT_EXPIRES_IN,
-        "ENABLE_COMMUNITY_SHARING": request.app.state.config.ENABLE_COMMUNITY_SHARING,
-        "ENABLE_MESSAGE_RATING": request.app.state.config.ENABLE_MESSAGE_RATING,
-        "ENABLE_FOLDERS": request.app.state.config.ENABLE_FOLDERS,
-        "FOLDER_MAX_FILE_COUNT": request.app.state.config.FOLDER_MAX_FILE_COUNT,
-        "ENABLE_CHANNELS": request.app.state.config.ENABLE_CHANNELS,
-        "ENABLE_MEMORIES": request.app.state.config.ENABLE_MEMORIES,
-        "ENABLE_NOTES": request.app.state.config.ENABLE_NOTES,
-        "ENABLE_USER_WEBHOOKS": request.app.state.config.ENABLE_USER_WEBHOOKS,
-        "ENABLE_USER_STATUS": request.app.state.config.ENABLE_USER_STATUS,
-        "PENDING_USER_OVERLAY_TITLE": request.app.state.config.PENDING_USER_OVERLAY_TITLE,
-        "PENDING_USER_OVERLAY_CONTENT": request.app.state.config.PENDING_USER_OVERLAY_CONTENT,
-        "RESPONSE_WATERMARK": request.app.state.config.RESPONSE_WATERMARK,
-    }
+    return _serialize_admin_config(request)
+
+
+@router.get("/invites")
+async def get_invite_codes(
+    request: Request,
+    user=Depends(get_verified_user),
+):
+    return {"items": get_invite_codes_for_user(user, request.app.state.config)}
+
+
+@router.post("/invites")
+async def issue_invite_code(
+    request: Request,
+    user=Depends(get_verified_user),
+    db: Session = Depends(get_session),
+):
+    can_create, reason, _ = can_user_create_invite_codes(
+        user, request.app.state.config, db=db
+    )
+    if not can_create:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=reason or ERROR_MESSAGES.ACCESS_PROHIBITED,
+        )
+
+    try:
+        invite = create_invite_code(request.app.state.config, user.id)
+        return invite
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create invite code.",
+        )
+
+
+@router.delete("/invites/{invite_id}")
+async def delete_invite_code(
+    invite_id: str,
+    request: Request,
+    user=Depends(get_verified_user),
+):
+    all_invite_codes = get_clean_invite_codes(request.app.state.config)
+
+    match_idx = None
+    for idx, invite in enumerate(all_invite_codes):
+        if not isinstance(invite, dict):
+            continue
+
+        if user.role != "admin" and invite.get("created_by") != user.id:
+            continue
+
+        if invite.get("id") == invite_id or str(invite.get("code", "")).lower() == invite_id.lower():
+            match_idx = idx
+            break
+
+    if match_idx is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Invite code not found."
+        )
+
+    all_invite_codes.pop(match_idx)
+    request.app.state.config.INVITE_CODES = all_invite_codes
+    return {"status": True}
 
 
 class AdminConfig(BaseModel):
@@ -1014,6 +1224,78 @@ class AdminConfig(BaseModel):
     ADMIN_EMAIL: Optional[str] = None
     WEBUI_URL: str
     ENABLE_SIGNUP: bool
+    ENABLE_PASSWORD_SIGNUP: bool = True
+    ENABLE_OAUTH_LOGIN: bool = True
+    ENABLE_OAUTH_SIGNUP: bool = False
+    OAUTH_ALLOWED_LOGIN_PROVIDERS: Optional[List[str]] = None
+    OAUTH_ALLOWED_SIGNUP_PROVIDERS: Optional[List[str]] = None
+    OAUTH_MERGE_ACCOUNTS_BY_EMAIL: bool = False
+    OAUTH_TIMEOUT: str = ""
+    OAUTH_AUDIENCE: str = ""
+    GOOGLE_OAUTH_ENABLED: bool = True
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_OAUTH_SCOPE: str = "openid email profile"
+    GOOGLE_SERVER_METADATA_URL: str = "https://accounts.google.com/.well-known/openid-configuration"
+    GOOGLE_REDIRECT_URI: str = ""
+    MICROSOFT_OAUTH_ENABLED: bool = True
+    MICROSOFT_CLIENT_ID: str = ""
+    MICROSOFT_CLIENT_SECRET: str = ""
+    MICROSOFT_CLIENT_TENANT_ID: str = ""
+    MICROSOFT_CLIENT_LOGIN_BASE_URL: str = "https://login.microsoftonline.com"
+    MICROSOFT_CLIENT_PICTURE_URL: str = "https://graph.microsoft.com/v1.0/me/photo/$value"
+    MICROSOFT_OAUTH_SCOPE: str = "openid email profile"
+    MICROSOFT_REDIRECT_URI: str = ""
+    GITHUB_OAUTH_ENABLED: bool = True
+    GITHUB_CLIENT_ID: str = ""
+    GITHUB_CLIENT_SECRET: str = ""
+    GITHUB_CLIENT_SCOPE: str = "user:email"
+    GITHUB_CLIENT_REDIRECT_URI: str = ""
+    GITHUB_ACCESS_TOKEN_URL: str = "https://github.com/login/oauth/access_token"
+    GITHUB_AUTHORIZE_URL: str = "https://github.com/login/oauth/authorize"
+    GITHUB_API_BASE_URL: str = "https://api.github.com"
+    GITHUB_USERINFO_ENDPOINT: str = "https://api.github.com/user"
+    OIDC_OAUTH_ENABLED: bool = True
+    OAUTH_PROVIDER_NAME: str = "SSO"
+    OAUTH_CLIENT_ID: str = ""
+    OAUTH_CLIENT_SECRET: str = ""
+    OPENID_PROVIDER_URL: str = ""
+    OPENID_REDIRECT_URI: str = ""
+    OAUTH_SCOPES: str = "openid email profile"
+    OAUTH_TOKEN_ENDPOINT_AUTH_METHOD: Optional[str] = None
+    OAUTH_CODE_CHALLENGE_METHOD: Optional[str] = None
+    OAUTH_SUB_CLAIM: Optional[str] = None
+    OAUTH_USERNAME_CLAIM: str = "name"
+    OAUTH_EMAIL_CLAIM: str = "email"
+    OAUTH_PICTURE_CLAIM: str = "picture"
+    OAUTH_GROUPS_CLAIM: str = "groups"
+    FEISHU_OAUTH_ENABLED: bool = True
+    FEISHU_CLIENT_ID: str = ""
+    FEISHU_CLIENT_SECRET: str = ""
+    FEISHU_OAUTH_SCOPE: str = "contact:user.base:readonly"
+    FEISHU_REDIRECT_URI: str = ""
+    FEISHU_ACCESS_TOKEN_URL: str = "https://open.feishu.cn/open-apis/authen/v2/oauth/token"
+    FEISHU_AUTHORIZE_URL: str = "https://accounts.feishu.cn/open-apis/authen/v1/authorize"
+    FEISHU_API_BASE_URL: str = "https://open.feishu.cn/open-apis"
+    FEISHU_USERINFO_ENDPOINT: str = "https://open.feishu.cn/open-apis/authen/v1/user_info"
+    DISCORD_OAUTH_ENABLED: bool = True
+    DISCORD_CLIENT_ID: str = ""
+    DISCORD_CLIENT_SECRET: str = ""
+    DISCORD_OAUTH_SCOPE: str = "identify email"
+    DISCORD_REDIRECT_URI: str = ""
+    DISCORD_ACCESS_TOKEN_URL: str = "https://discord.com/api/oauth2/token"
+    DISCORD_AUTHORIZE_URL: str = "https://discord.com/oauth2/authorize"
+    DISCORD_API_BASE_URL: str = "https://discord.com/api"
+    DISCORD_USERINFO_ENDPOINT: str = "https://discord.com/api/users/@me"
+    ENABLE_INVITE_ONLY_AUTH: bool = False
+    INVITE_CREATOR_SCOPE: str = "admin"
+    INVITE_CREATOR_GROUP_IDS: List[str] = Field(default_factory=list)
+    INVITE_CREATOR_COOLDOWN_SECONDS: int = 3600
+    INVITE_CODE_LENGTH: int = 8
+    INVITE_CODE_TTL_SECONDS: int = 604800
+    INVITE_CODE_PREFIX: str = ""
+    INVITE_CODE_REUSABLE: bool = False
+    INVITE_CODE_MAX_USES: int = 1
     ENABLE_API_KEYS: bool
     ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS: bool
     API_KEYS_ALLOWED_ENDPOINTS: str
@@ -1042,6 +1324,220 @@ async def update_admin_config(
     request.app.state.config.ADMIN_EMAIL = form_data.ADMIN_EMAIL
     request.app.state.config.WEBUI_URL = form_data.WEBUI_URL
     request.app.state.config.ENABLE_SIGNUP = form_data.ENABLE_SIGNUP
+    request.app.state.config.ENABLE_PASSWORD_SIGNUP = form_data.ENABLE_PASSWORD_SIGNUP
+    request.app.state.config.ENABLE_OAUTH_LOGIN = form_data.ENABLE_OAUTH_LOGIN
+    request.app.state.config.ENABLE_OAUTH_SIGNUP = form_data.ENABLE_OAUTH_SIGNUP
+    request.app.state.config.OAUTH_MERGE_ACCOUNTS_BY_EMAIL = (
+        form_data.OAUTH_MERGE_ACCOUNTS_BY_EMAIL
+    )
+    request.app.state.config.OAUTH_TIMEOUT = _sanitize_oauth_timeout(
+        form_data.OAUTH_TIMEOUT
+    )
+    request.app.state.config.OAUTH_AUDIENCE = _sanitize_text(
+        form_data.OAUTH_AUDIENCE, 256
+    )
+
+    request.app.state.config.GOOGLE_OAUTH_ENABLED = form_data.GOOGLE_OAUTH_ENABLED
+    request.app.state.config.GOOGLE_CLIENT_ID = _sanitize_text(
+        form_data.GOOGLE_CLIENT_ID, 512
+    )
+    request.app.state.config.GOOGLE_CLIENT_SECRET = _sanitize_text(
+        form_data.GOOGLE_CLIENT_SECRET, 1024
+    )
+    request.app.state.config.GOOGLE_OAUTH_SCOPE = _sanitize_text(
+        form_data.GOOGLE_OAUTH_SCOPE, 512
+    )
+    request.app.state.config.GOOGLE_SERVER_METADATA_URL = _sanitize_text(
+        form_data.GOOGLE_SERVER_METADATA_URL, 1024
+    )
+    request.app.state.config.GOOGLE_REDIRECT_URI = _sanitize_text(
+        form_data.GOOGLE_REDIRECT_URI, 1024
+    )
+
+    request.app.state.config.MICROSOFT_OAUTH_ENABLED = form_data.MICROSOFT_OAUTH_ENABLED
+    request.app.state.config.MICROSOFT_CLIENT_ID = _sanitize_text(
+        form_data.MICROSOFT_CLIENT_ID, 512
+    )
+    request.app.state.config.MICROSOFT_CLIENT_SECRET = _sanitize_text(
+        form_data.MICROSOFT_CLIENT_SECRET, 1024
+    )
+    request.app.state.config.MICROSOFT_CLIENT_TENANT_ID = _sanitize_text(
+        form_data.MICROSOFT_CLIENT_TENANT_ID, 256
+    )
+    request.app.state.config.MICROSOFT_CLIENT_LOGIN_BASE_URL = _sanitize_text(
+        form_data.MICROSOFT_CLIENT_LOGIN_BASE_URL, 1024
+    )
+    request.app.state.config.MICROSOFT_CLIENT_PICTURE_URL = _sanitize_text(
+        form_data.MICROSOFT_CLIENT_PICTURE_URL, 1024
+    )
+    request.app.state.config.MICROSOFT_OAUTH_SCOPE = _sanitize_text(
+        form_data.MICROSOFT_OAUTH_SCOPE, 512
+    )
+    request.app.state.config.MICROSOFT_REDIRECT_URI = _sanitize_text(
+        form_data.MICROSOFT_REDIRECT_URI, 1024
+    )
+
+    request.app.state.config.GITHUB_OAUTH_ENABLED = form_data.GITHUB_OAUTH_ENABLED
+    request.app.state.config.GITHUB_CLIENT_ID = _sanitize_text(
+        form_data.GITHUB_CLIENT_ID, 512
+    )
+    request.app.state.config.GITHUB_CLIENT_SECRET = _sanitize_text(
+        form_data.GITHUB_CLIENT_SECRET, 1024
+    )
+    request.app.state.config.GITHUB_CLIENT_SCOPE = _sanitize_text(
+        form_data.GITHUB_CLIENT_SCOPE, 512
+    )
+    request.app.state.config.GITHUB_CLIENT_REDIRECT_URI = _sanitize_text(
+        form_data.GITHUB_CLIENT_REDIRECT_URI, 1024
+    )
+    request.app.state.config.GITHUB_ACCESS_TOKEN_URL = _sanitize_text(
+        form_data.GITHUB_ACCESS_TOKEN_URL, 1024
+    )
+    request.app.state.config.GITHUB_AUTHORIZE_URL = _sanitize_text(
+        form_data.GITHUB_AUTHORIZE_URL, 1024
+    )
+    request.app.state.config.GITHUB_API_BASE_URL = _sanitize_text(
+        form_data.GITHUB_API_BASE_URL, 1024
+    )
+    request.app.state.config.GITHUB_USERINFO_ENDPOINT = _sanitize_text(
+        form_data.GITHUB_USERINFO_ENDPOINT, 1024
+    )
+
+    request.app.state.config.OIDC_OAUTH_ENABLED = form_data.OIDC_OAUTH_ENABLED
+    request.app.state.config.OAUTH_PROVIDER_NAME = _sanitize_text(
+        form_data.OAUTH_PROVIDER_NAME, 128
+    )
+    request.app.state.config.OAUTH_CLIENT_ID = _sanitize_text(
+        form_data.OAUTH_CLIENT_ID, 512
+    )
+    request.app.state.config.OAUTH_CLIENT_SECRET = _sanitize_text(
+        form_data.OAUTH_CLIENT_SECRET, 1024
+    )
+    request.app.state.config.OPENID_PROVIDER_URL = _sanitize_text(
+        form_data.OPENID_PROVIDER_URL, 1024
+    )
+    request.app.state.config.OPENID_REDIRECT_URI = _sanitize_text(
+        form_data.OPENID_REDIRECT_URI, 1024
+    )
+    request.app.state.config.OAUTH_SCOPES = _sanitize_text(
+        form_data.OAUTH_SCOPES, 512
+    )
+    request.app.state.config.OAUTH_TOKEN_ENDPOINT_AUTH_METHOD = _sanitize_text(
+        form_data.OAUTH_TOKEN_ENDPOINT_AUTH_METHOD, 64
+    ) or None
+    request.app.state.config.OAUTH_CODE_CHALLENGE_METHOD = (
+        _sanitize_oauth_code_challenge_method(form_data.OAUTH_CODE_CHALLENGE_METHOD)
+    )
+    request.app.state.config.OAUTH_SUB_CLAIM = _sanitize_text(
+        form_data.OAUTH_SUB_CLAIM, 128
+    ) or None
+    request.app.state.config.OAUTH_USERNAME_CLAIM = _sanitize_text(
+        form_data.OAUTH_USERNAME_CLAIM, 128
+    )
+    request.app.state.config.OAUTH_EMAIL_CLAIM = _sanitize_text(
+        form_data.OAUTH_EMAIL_CLAIM, 128
+    )
+    request.app.state.config.OAUTH_PICTURE_CLAIM = _sanitize_text(
+        form_data.OAUTH_PICTURE_CLAIM, 128
+    )
+    request.app.state.config.OAUTH_GROUPS_CLAIM = _sanitize_text(
+        form_data.OAUTH_GROUPS_CLAIM, 128
+    )
+
+    request.app.state.config.FEISHU_OAUTH_ENABLED = form_data.FEISHU_OAUTH_ENABLED
+    request.app.state.config.FEISHU_CLIENT_ID = _sanitize_text(
+        form_data.FEISHU_CLIENT_ID, 512
+    )
+    request.app.state.config.FEISHU_CLIENT_SECRET = _sanitize_text(
+        form_data.FEISHU_CLIENT_SECRET, 1024
+    )
+    request.app.state.config.FEISHU_OAUTH_SCOPE = _sanitize_text(
+        form_data.FEISHU_OAUTH_SCOPE, 512
+    )
+    request.app.state.config.FEISHU_REDIRECT_URI = _sanitize_text(
+        form_data.FEISHU_REDIRECT_URI, 1024
+    )
+    request.app.state.config.FEISHU_ACCESS_TOKEN_URL = _sanitize_text(
+        form_data.FEISHU_ACCESS_TOKEN_URL, 1024
+    )
+    request.app.state.config.FEISHU_AUTHORIZE_URL = _sanitize_text(
+        form_data.FEISHU_AUTHORIZE_URL, 1024
+    )
+    request.app.state.config.FEISHU_API_BASE_URL = _sanitize_text(
+        form_data.FEISHU_API_BASE_URL, 1024
+    )
+    request.app.state.config.FEISHU_USERINFO_ENDPOINT = _sanitize_text(
+        form_data.FEISHU_USERINFO_ENDPOINT, 1024
+    )
+
+    request.app.state.config.DISCORD_OAUTH_ENABLED = form_data.DISCORD_OAUTH_ENABLED
+    request.app.state.config.DISCORD_CLIENT_ID = _sanitize_text(
+        form_data.DISCORD_CLIENT_ID, 512
+    )
+    request.app.state.config.DISCORD_CLIENT_SECRET = _sanitize_text(
+        form_data.DISCORD_CLIENT_SECRET, 1024
+    )
+    request.app.state.config.DISCORD_OAUTH_SCOPE = _sanitize_text(
+        form_data.DISCORD_OAUTH_SCOPE, 512
+    )
+    request.app.state.config.DISCORD_REDIRECT_URI = _sanitize_text(
+        form_data.DISCORD_REDIRECT_URI, 1024
+    )
+    request.app.state.config.DISCORD_ACCESS_TOKEN_URL = _sanitize_text(
+        form_data.DISCORD_ACCESS_TOKEN_URL, 1024
+    )
+    request.app.state.config.DISCORD_AUTHORIZE_URL = _sanitize_text(
+        form_data.DISCORD_AUTHORIZE_URL, 1024
+    )
+    request.app.state.config.DISCORD_API_BASE_URL = _sanitize_text(
+        form_data.DISCORD_API_BASE_URL, 1024
+    )
+    request.app.state.config.DISCORD_USERINFO_ENDPOINT = _sanitize_text(
+        form_data.DISCORD_USERINFO_ENDPOINT, 1024
+    )
+
+    try:
+        _reload_oauth_runtime(request)
+    except Exception as e:
+        log.exception("Failed to reload OAuth configuration")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to apply SSO configuration: {e}",
+        )
+    request.app.state.config.OAUTH_ALLOWED_LOGIN_PROVIDERS = _sanitize_oauth_provider_list(
+        form_data.OAUTH_ALLOWED_LOGIN_PROVIDERS
+    )
+    request.app.state.config.OAUTH_ALLOWED_SIGNUP_PROVIDERS = _sanitize_oauth_provider_list(
+        form_data.OAUTH_ALLOWED_SIGNUP_PROVIDERS
+    )
+    request.app.state.config.ENABLE_INVITE_ONLY_AUTH = form_data.ENABLE_INVITE_ONLY_AUTH
+
+    request.app.state.config.INVITE_CREATOR_SCOPE = (
+        form_data.INVITE_CREATOR_SCOPE
+        if form_data.INVITE_CREATOR_SCOPE in ["admin", "groups", "all"]
+        else "admin"
+    )
+    request.app.state.config.INVITE_CREATOR_GROUP_IDS = [
+        str(group_id)
+        for group_id in (form_data.INVITE_CREATOR_GROUP_IDS or [])
+        if str(group_id).strip()
+    ]
+    request.app.state.config.INVITE_CREATOR_COOLDOWN_SECONDS = max(
+        0, int(form_data.INVITE_CREATOR_COOLDOWN_SECONDS or 0)
+    )
+    request.app.state.config.INVITE_CODE_LENGTH = max(
+        4, min(32, int(form_data.INVITE_CODE_LENGTH or 8))
+    )
+    request.app.state.config.INVITE_CODE_TTL_SECONDS = max(
+        0, int(form_data.INVITE_CODE_TTL_SECONDS or 0)
+    )
+    request.app.state.config.INVITE_CODE_PREFIX = re.sub(
+        r"[^A-Za-z0-9_-]", "", form_data.INVITE_CODE_PREFIX or ""
+    )[:24]
+    request.app.state.config.INVITE_CODE_REUSABLE = form_data.INVITE_CODE_REUSABLE
+    request.app.state.config.INVITE_CODE_MAX_USES = max(
+        0, int(form_data.INVITE_CODE_MAX_USES or 0)
+    )
 
     request.app.state.config.ENABLE_API_KEYS = form_data.ENABLE_API_KEYS
     request.app.state.config.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS = (
@@ -1087,30 +1583,7 @@ async def update_admin_config(
 
     request.app.state.config.RESPONSE_WATERMARK = form_data.RESPONSE_WATERMARK
 
-    return {
-        "SHOW_ADMIN_DETAILS": request.app.state.config.SHOW_ADMIN_DETAILS,
-        "ADMIN_EMAIL": request.app.state.config.ADMIN_EMAIL,
-        "WEBUI_URL": request.app.state.config.WEBUI_URL,
-        "ENABLE_SIGNUP": request.app.state.config.ENABLE_SIGNUP,
-        "ENABLE_API_KEYS": request.app.state.config.ENABLE_API_KEYS,
-        "ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS": request.app.state.config.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS,
-        "API_KEYS_ALLOWED_ENDPOINTS": request.app.state.config.API_KEYS_ALLOWED_ENDPOINTS,
-        "DEFAULT_USER_ROLE": request.app.state.config.DEFAULT_USER_ROLE,
-        "DEFAULT_GROUP_ID": request.app.state.config.DEFAULT_GROUP_ID,
-        "JWT_EXPIRES_IN": request.app.state.config.JWT_EXPIRES_IN,
-        "ENABLE_COMMUNITY_SHARING": request.app.state.config.ENABLE_COMMUNITY_SHARING,
-        "ENABLE_MESSAGE_RATING": request.app.state.config.ENABLE_MESSAGE_RATING,
-        "ENABLE_FOLDERS": request.app.state.config.ENABLE_FOLDERS,
-        "FOLDER_MAX_FILE_COUNT": request.app.state.config.FOLDER_MAX_FILE_COUNT,
-        "ENABLE_CHANNELS": request.app.state.config.ENABLE_CHANNELS,
-        "ENABLE_MEMORIES": request.app.state.config.ENABLE_MEMORIES,
-        "ENABLE_NOTES": request.app.state.config.ENABLE_NOTES,
-        "ENABLE_USER_WEBHOOKS": request.app.state.config.ENABLE_USER_WEBHOOKS,
-        "ENABLE_USER_STATUS": request.app.state.config.ENABLE_USER_STATUS,
-        "PENDING_USER_OVERLAY_TITLE": request.app.state.config.PENDING_USER_OVERLAY_TITLE,
-        "PENDING_USER_OVERLAY_CONTENT": request.app.state.config.PENDING_USER_OVERLAY_CONTENT,
-        "RESPONSE_WATERMARK": request.app.state.config.RESPONSE_WATERMARK,
-    }
+    return _serialize_admin_config(request)
 
 
 class LdapServerConfig(BaseModel):
@@ -1292,7 +1765,22 @@ async def token_exchange(
             detail="Token exchange is disabled",
         )
 
+    if not request.app.state.config.ENABLE_OAUTH_LOGIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+        )
+
     provider = provider.lower()
+
+    allowed_login_providers = _sanitize_oauth_provider_list(
+        request.app.state.config.OAUTH_ALLOWED_LOGIN_PROVIDERS
+    )
+    if isinstance(allowed_login_providers, list) and provider not in allowed_login_providers:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+        )
 
     # Check if provider is configured
     if provider not in OAUTH_PROVIDERS:

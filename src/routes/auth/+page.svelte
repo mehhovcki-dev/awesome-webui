@@ -17,15 +17,14 @@
 		updateUserTimezone
 	} from '$lib/apis/auths';
 
-	import { WEBUI_API_BASE_URL, WEBUI_BASE_URL } from '$lib/constants';
+	import { WEBUI_BASE_URL } from '$lib/constants';
 	import { WEBUI_NAME, config, user, socket } from '$lib/stores';
 
-	import { generateInitialsImage, canvasPixelTest, getUserTimezone } from '$lib/utils';
+	import { generateInitialsImage, getUserTimezone } from '$lib/utils';
 
 	import Spinner from '$lib/components/common/Spinner.svelte';
 	import OnBoarding from '$lib/components/OnBoarding.svelte';
 	import SensitiveInput from '$lib/components/common/SensitiveInput.svelte';
-	import { redirect } from '@sveltejs/kit';
 
 	const i18n = getContext('i18n');
 
@@ -39,8 +38,14 @@
 	let email = '';
 	let password = '';
 	let confirmPassword = '';
+	let inviteCode = '';
+	let visibleOAuthProviders: string[] = [];
 
 	let ldapUsername = '';
+
+	$: if (mode === 'signup' && !($config?.features?.enable_password_signup ?? true)) {
+		mode = $config?.features.enable_ldap ? 'ldap' : 'signin';
+	}
 
 	const setSessionUser = async (sessionUser, redirectPath: string | null = null) => {
 		if (sessionUser) {
@@ -85,12 +90,16 @@
 			}
 		}
 
-		const sessionUser = await userSignUp(name, email, password, generateInitialsImage(name)).catch(
-			(error) => {
-				toast.error(`${error}`);
-				return null;
-			}
-		);
+		const sessionUser = await userSignUp(
+			name,
+			email,
+			password,
+			generateInitialsImage(name),
+			inviteCode
+		).catch((error) => {
+			toast.error(`${error}`);
+			return null;
+		});
 
 		await setSessionUser(sessionUser);
 	};
@@ -109,9 +118,53 @@
 		} else if (mode === 'signin') {
 			await signInHandler();
 		} else {
+			if (!($config?.features?.enable_password_signup ?? true)) {
+				toast.error($i18n.t('Email and password signups are disabled.'));
+				return;
+			}
 			await signUpHandler();
 		}
 	};
+
+	const getOAuthLoginUrl = (provider: string) => {
+		const inviteCodeParam = inviteCode.trim()
+			? `?invite_code=${encodeURIComponent(inviteCode.trim())}`
+			: '';
+		return `${WEBUI_BASE_URL}/oauth/${provider}/login${inviteCodeParam}`;
+	};
+
+	const getAllowedOAuthProviders = (target: 'login' | 'signup') => {
+		const configuredProviders = Object.keys($config?.oauth?.providers ?? {});
+		const rawAllowedProviders =
+			target === 'login'
+				? $config?.oauth?.allowed_login_providers
+				: $config?.oauth?.allowed_signup_providers;
+
+		if (!Array.isArray(rawAllowedProviders)) {
+			return configuredProviders;
+		}
+
+		const configuredProviderSet = new Set(configuredProviders);
+		return rawAllowedProviders
+			.map((provider) => String(provider).trim().toLowerCase())
+			.filter((provider) => configuredProviderSet.has(provider));
+	};
+
+	const getVisibleOAuthProviders = () => {
+		const loginProviders = getAllowedOAuthProviders('login');
+		if (mode !== 'signup') {
+			return loginProviders;
+		}
+
+		if (!($config?.features?.enable_oauth_signup ?? false)) {
+			return [];
+		}
+
+		const signupProviders = new Set(getAllowedOAuthProviders('signup'));
+		return loginProviders.filter((provider) => signupProviders.has(provider));
+	};
+
+	$: visibleOAuthProviders = getVisibleOAuthProviders();
 
 	const oauthCallbackHandler = async () => {
 		// Get the value of the 'token' cookie
@@ -211,7 +264,7 @@
 <div class="w-full h-screen max-h-[100dvh] text-white relative" id="auth-page">
 	<div class="w-full h-full absolute top-0 left-0 bg-white dark:bg-black"></div>
 
-	<div class="w-full absolute top-0 left-0 right-0 h-8 drag-region" />
+	<div class="w-full absolute top-0 left-0 right-0 h-8 drag-region"></div>
 
 	{#if loaded}
 		<div
@@ -367,6 +420,22 @@
 												/>
 											</div>
 										{/if}
+
+										{#if mode === 'signup' && $config?.features?.enable_invite_only_auth}
+											<div class="mt-2">
+												<label for="invite-code" class="text-sm font-medium text-left mb-1 block"
+													>{$i18n.t('Invite Code')}</label
+												>
+												<input
+													bind:value={inviteCode}
+													type="text"
+													id="invite-code"
+													class="my-0.5 w-full text-sm outline-hidden bg-transparent placeholder:text-gray-300 dark:placeholder:text-gray-600"
+													placeholder={$i18n.t('Enter your invite code')}
+													required
+												/>
+											</div>
+										{/if}
 									</div>
 								{/if}
 								<div class="mt-5">
@@ -390,7 +459,9 @@
 														: $i18n.t('Create Account')}
 											</button>
 
-											{#if $config?.features.enable_signup && !($config?.onboarding ?? false)}
+											{#if $config?.features.enable_signup &&
+												($config?.features.enable_password_signup ?? true) &&
+												!($config?.onboarding ?? false)}
 												<div class=" mt-4 text-sm text-center">
 													{mode === 'signin'
 														? $i18n.t("Don't have an account?")
@@ -416,7 +487,7 @@
 								</div>
 							</form>
 
-							{#if Object.keys($config?.oauth?.providers ?? {}).length > 0}
+							{#if ($config?.features?.enable_oauth_login ?? true) && visibleOAuthProviders.length > 0}
 								<div class="inline-flex items-center justify-center w-full">
 									<hr class="w-32 h-px my-4 border-0 dark:bg-gray-100/10 bg-gray-700/10" />
 									{#if $config?.features.enable_login_form || $config?.features.enable_ldap || form}
@@ -429,11 +500,11 @@
 									<hr class="w-32 h-px my-4 border-0 dark:bg-gray-100/10 bg-gray-700/10" />
 								</div>
 								<div class="flex flex-col space-y-2">
-									{#if $config?.oauth?.providers?.google}
+									{#if visibleOAuthProviders.includes('google')}
 										<button
 											class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
 											on:click={() => {
-												window.location.href = `${WEBUI_BASE_URL}/oauth/google/login`;
+												window.location.href = getOAuthLoginUrl('google');
 											}}
 										>
 											<svg
@@ -459,11 +530,11 @@
 											<span>{$i18n.t('Continue with {{provider}}', { provider: 'Google' })}</span>
 										</button>
 									{/if}
-									{#if $config?.oauth?.providers?.microsoft}
+									{#if visibleOAuthProviders.includes('microsoft')}
 										<button
 											class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
 											on:click={() => {
-												window.location.href = `${WEBUI_BASE_URL}/oauth/microsoft/login`;
+												window.location.href = getOAuthLoginUrl('microsoft');
 											}}
 										>
 											<svg
@@ -490,11 +561,11 @@
 											>
 										</button>
 									{/if}
-									{#if $config?.oauth?.providers?.github}
+									{#if visibleOAuthProviders.includes('github')}
 										<button
 											class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
 											on:click={() => {
-												window.location.href = `${WEBUI_BASE_URL}/oauth/github/login`;
+												window.location.href = getOAuthLoginUrl('github');
 											}}
 										>
 											<svg
@@ -511,11 +582,11 @@
 											<span>{$i18n.t('Continue with {{provider}}', { provider: 'GitHub' })}</span>
 										</button>
 									{/if}
-									{#if $config?.oauth?.providers?.oidc}
+									{#if visibleOAuthProviders.includes('oidc')}
 										<button
 											class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
 											on:click={() => {
-												window.location.href = `${WEBUI_BASE_URL}/oauth/oidc/login`;
+												window.location.href = getOAuthLoginUrl('oidc');
 											}}
 										>
 											<svg
@@ -541,14 +612,35 @@
 											>
 										</button>
 									{/if}
-									{#if $config?.oauth?.providers?.feishu}
+									{#if visibleOAuthProviders.includes('feishu')}
 										<button
 											class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
 											on:click={() => {
-												window.location.href = `${WEBUI_BASE_URL}/oauth/feishu/login`;
+												window.location.href = getOAuthLoginUrl('feishu');
 											}}
 										>
 											<span>{$i18n.t('Continue with {{provider}}', { provider: 'Feishu' })}</span>
+										</button>
+									{/if}
+									{#if visibleOAuthProviders.includes('discord')}
+										<button
+											class="flex justify-center items-center bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 transition w-full rounded-full font-medium text-sm py-2.5"
+											on:click={() => {
+												window.location.href = getOAuthLoginUrl('discord');
+											}}
+										>
+											<svg
+												xmlns="http://www.w3.org/2000/svg"
+												viewBox="0 0 256 199"
+												class="size-6 mr-3"
+												aria-hidden="true"
+											>
+												<path
+													fill="currentColor"
+													d="M216.9 16.6A208.5 208.5 0 0 0 163.3 0a150.5 150.5 0 0 0-6.8 13.9a193.2 193.2 0 0 0-57 0A150.5 150.5 0 0 0 92.7 0A208.5 208.5 0 0 0 39.1 16.6C5.2 67.5-3.9 117.1.6 165.8a209.9 209.9 0 0 0 64.7 33.2a161.8 161.8 0 0 0 13.9-22.6a133.7 133.7 0 0 1-21.9-10.5c1.9-1.4 3.7-2.8 5.4-4.3c42.3 19.8 88.2 19.8 130 0c1.8 1.5 3.6 2.9 5.4 4.3a133.7 133.7 0 0 1-21.9 10.5a161.8 161.8 0 0 0 13.9 22.6a209.9 209.9 0 0 0 64.7-33.2c5.3-56.4-9.1-105.5-37.9-149.2ZM85.5 135.6c-12.6 0-22.9-11.6-22.9-25.8s10.1-25.8 22.9-25.8s23.1 11.6 22.9 25.8s-10.2 25.8-22.9 25.8Zm84.9 0c-12.6 0-22.9-11.6-22.9-25.8s10.1-25.8 22.9-25.8s23.1 11.6 22.9 25.8s-10.2 25.8-22.9 25.8Z"
+												/>
+											</svg>
+											<span>{$i18n.t('Continue with {{provider}}', { provider: 'Discord' })}</span>
 										</button>
 									{/if}
 								</div>

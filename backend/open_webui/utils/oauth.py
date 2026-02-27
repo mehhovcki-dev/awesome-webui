@@ -35,7 +35,10 @@ from open_webui.models.users import Users
 from open_webui.models.groups import Groups, GroupModel, GroupUpdateForm, GroupForm
 from open_webui.config import (
     DEFAULT_USER_ROLE,
+    ENABLE_OAUTH_LOGIN,
     ENABLE_OAUTH_SIGNUP,
+    OAUTH_ALLOWED_LOGIN_PROVIDERS,
+    OAUTH_ALLOWED_SIGNUP_PROVIDERS,
     OAUTH_MERGE_ACCOUNTS_BY_EMAIL,
     OAUTH_PROVIDERS,
     ENABLE_OAUTH_ROLE_MANAGEMENT,
@@ -73,9 +76,15 @@ from open_webui.env import (
     OAUTH_MAX_SESSIONS_PER_USER,
 )
 from open_webui.utils.misc import parse_duration
-from open_webui.utils.auth import get_password_hash, create_token
+from open_webui.utils.auth import (
+    get_password_hash,
+    create_token,
+    decode_token,
+    get_http_authorization_cred,
+)
 from open_webui.utils.webhook import post_webhook
 from open_webui.utils.groups import apply_default_group_assignment
+from open_webui.utils.invites import consume_invite_code
 
 from mcp.shared.auth import (
     OAuthClientMetadata as MCPOAuthClientMetadata,
@@ -110,7 +119,10 @@ log = logging.getLogger(__name__)
 
 auth_manager_config = AppConfig()
 auth_manager_config.DEFAULT_USER_ROLE = DEFAULT_USER_ROLE
+auth_manager_config.ENABLE_OAUTH_LOGIN = ENABLE_OAUTH_LOGIN
 auth_manager_config.ENABLE_OAUTH_SIGNUP = ENABLE_OAUTH_SIGNUP
+auth_manager_config.OAUTH_ALLOWED_LOGIN_PROVIDERS = OAUTH_ALLOWED_LOGIN_PROVIDERS
+auth_manager_config.OAUTH_ALLOWED_SIGNUP_PROVIDERS = OAUTH_ALLOWED_SIGNUP_PROVIDERS
 auth_manager_config.OAUTH_MERGE_ACCOUNTS_BY_EMAIL = OAUTH_MERGE_ACCOUNTS_BY_EMAIL
 auth_manager_config.ENABLE_OAUTH_ROLE_MANAGEMENT = ENABLE_OAUTH_ROLE_MANAGEMENT
 auth_manager_config.ENABLE_OAUTH_GROUP_MANAGEMENT = ENABLE_OAUTH_GROUP_MANAGEMENT
@@ -166,6 +178,61 @@ def decrypt_data(data: str):
     except Exception as e:
         log.error(f"Error decrypting data: {e}")
         raise
+
+
+def _resolve_allowed_providers(allowed_providers) -> list[str]:
+    configured_providers = list(OAUTH_PROVIDERS.keys())
+    if not isinstance(allowed_providers, list):
+        return configured_providers
+
+    normalized = []
+    for provider in allowed_providers:
+        provider_name = str(provider).strip().lower()
+        if not provider_name or provider_name not in configured_providers:
+            continue
+        if provider_name not in normalized:
+            normalized.append(provider_name)
+    return normalized
+
+
+def _sanitize_internal_redirect_path(path: str, default: str = "/") -> str:
+    redirect_path = str(path or "").strip()
+    if not redirect_path.startswith("/"):
+        return default
+    if redirect_path.startswith("//"):
+        return default
+    if len(redirect_path) > 2048:
+        return default
+    return redirect_path
+
+
+def _append_query_params(url: str, params: dict[str, str]) -> str:
+    parsed = urllib.parse.urlparse(url)
+    query = dict(urllib.parse.parse_qsl(parsed.query, keep_blank_values=True))
+    for key, value in params.items():
+        if value is None:
+            continue
+        query[key] = value
+    new_query = urllib.parse.urlencode(query)
+    return urllib.parse.urlunparse(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            new_query,
+            parsed.fragment,
+        )
+    )
+
+
+def _get_request_token(request) -> Optional[str]:
+    auth_header = request.headers.get("Authorization")
+    if auth_header:
+        auth_cred = get_http_authorization_cred(auth_header)
+        if auth_cred:
+            return auth_cred.credentials
+    return request.cookies.get("token")
 
 
 def _build_oauth_callback_error_message(e: Exception) -> str:
@@ -1390,8 +1457,23 @@ class OAuthManager:
             return "/user.png"
 
     async def handle_login(self, request, provider):
+        if not auth_manager_config.ENABLE_OAUTH_LOGIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+            )
+
         if provider not in OAUTH_PROVIDERS:
             raise HTTPException(404)
+
+        allowed_login_providers = _resolve_allowed_providers(
+            request.app.state.config.OAUTH_ALLOWED_LOGIN_PROVIDERS
+        )
+        if provider not in allowed_login_providers:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+            )
         # If the provider has a custom redirect URL, use that, otherwise automatically generate one
         redirect_uri = OAUTH_PROVIDERS[provider].get("redirect_uri") or request.url_for(
             "oauth_login_callback", provider=provider
@@ -1404,11 +1486,86 @@ class OAuthManager:
         if auth_manager_config.OAUTH_AUDIENCE:
             kwargs["audience"] = auth_manager_config.OAUTH_AUDIENCE
 
-        return await client.authorize_redirect(request, redirect_uri, **kwargs)
+        response = await client.authorize_redirect(request, redirect_uri, **kwargs)
+
+        oauth_mode = (request.query_params.get("mode") or "").strip().lower()
+        if oauth_mode in {"connect", "link"}:
+            token = _get_request_token(request)
+            if not token:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=ERROR_MESSAGES.INVALID_TOKEN,
+                )
+
+            try:
+                token_data = decode_token(token)
+            except Exception:
+                token_data = None
+            link_user_id = token_data.get("id") if token_data else None
+            link_user = Users.get_user_by_id(link_user_id) if link_user_id else None
+            if not link_user:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail=ERROR_MESSAGES.INVALID_TOKEN,
+                )
+
+            link_redirect = _sanitize_internal_redirect_path(
+                request.query_params.get("redirect") or "/"
+            )
+
+            response.set_cookie(
+                key="pending_oauth_link_user_id",
+                value=link_user.id,
+                httponly=True,
+                samesite=WEBUI_AUTH_COOKIE_SAME_SITE,
+                secure=WEBUI_AUTH_COOKIE_SECURE,
+            )
+            response.set_cookie(
+                key="pending_oauth_link_redirect",
+                value=link_redirect,
+                httponly=True,
+                samesite=WEBUI_AUTH_COOKIE_SAME_SITE,
+                secure=WEBUI_AUTH_COOKIE_SECURE,
+            )
+
+        invite_code = (request.query_params.get("invite_code") or "").strip()
+        if invite_code:
+            response.set_cookie(
+                key="pending_invite_code",
+                value=invite_code,
+                httponly=True,
+                samesite=WEBUI_AUTH_COOKIE_SAME_SITE,
+                secure=WEBUI_AUTH_COOKIE_SECURE,
+            )
+
+        return response
 
     async def handle_callback(self, request, provider, response, db=None):
+        if not auth_manager_config.ENABLE_OAUTH_LOGIN:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+            )
+
         if provider not in OAUTH_PROVIDERS:
             raise HTTPException(404)
+
+        allowed_login_providers = _resolve_allowed_providers(
+            request.app.state.config.OAUTH_ALLOWED_LOGIN_PROVIDERS
+        )
+        if provider not in allowed_login_providers:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+            )
+
+        link_user_id = (
+            request.cookies.get("pending_oauth_link_user_id", "") or ""
+        ).strip()
+        link_redirect_path = _sanitize_internal_redirect_path(
+            request.cookies.get("pending_oauth_link_redirect", "") or "/"
+        )
+        is_oauth_link_flow = bool(link_user_id)
 
         error_message = None
         try:
@@ -1530,47 +1687,100 @@ class OAuthManager:
                 )
                 raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
 
-            # Check if the user exists
-            user = Users.get_user_by_oauth_sub(provider, sub, db=db)
-            if not user:
-                # If the user does not exist, check if merging is enabled
-                if auth_manager_config.OAUTH_MERGE_ACCOUNTS_BY_EMAIL:
-                    # Check if the user exists by email
-                    user = Users.get_user_by_email(email, db=db)
-                    if user:
-                        # Update the user with the new oauth sub
-                        Users.update_user_oauth_by_id(user.id, provider, sub, db=db)
+            if is_oauth_link_flow:
+                link_user = Users.get_user_by_id(link_user_id, db=db)
+                if not link_user:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Account linking session expired. Please try again.",
+                    )
+
+                existing_linked_user = Users.get_user_by_oauth_sub(provider, sub, db=db)
+                if (
+                    existing_linked_user
+                    and existing_linked_user.id != link_user.id
+                ):
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="This SSO account is already linked to another user.",
+                    )
+
+                if not existing_linked_user:
+                    Users.update_user_oauth_by_id(link_user.id, provider, sub, db=db)
+
+                user = Users.get_user_by_id(link_user.id, db=db)
+            else:
+                # Check if the user exists
+                user = Users.get_user_by_oauth_sub(provider, sub, db=db)
+                if not user:
+                    # If the user does not exist, check if merging is enabled
+                    if auth_manager_config.OAUTH_MERGE_ACCOUNTS_BY_EMAIL:
+                        # Check if the user exists by email
+                        user = Users.get_user_by_email(email, db=db)
+                        if user:
+                            # Update the user with the new oauth sub
+                            Users.update_user_oauth_by_id(user.id, provider, sub, db=db)
 
             if user:
-                determined_role = self.get_user_role(user, user_data)
-                if user.role != determined_role:
-                    Users.update_user_role_by_id(user.id, determined_role, db=db)
-                    # Update the user object in memory as well,
-                    # to avoid problems with the ENABLE_OAUTH_GROUP_MANAGEMENT check below
-                    user.role = determined_role
-                # Update profile picture if enabled and different from current
-                if auth_manager_config.OAUTH_UPDATE_PICTURE_ON_LOGIN:
-                    picture_claim = auth_manager_config.OAUTH_PICTURE_CLAIM
-                    if picture_claim:
-                        new_picture_url = user_data.get(
-                            picture_claim,
-                            OAUTH_PROVIDERS[provider].get("picture_url", ""),
-                        )
-                        processed_picture_url = await self._process_picture_url(
-                            new_picture_url, token.get("access_token")
-                        )
-                        if processed_picture_url != user.profile_image_url:
-                            Users.update_user_profile_image_url_by_id(
-                                user.id, processed_picture_url, db=db
+                if not is_oauth_link_flow:
+                    determined_role = self.get_user_role(user, user_data)
+                    if user.role != determined_role:
+                        Users.update_user_role_by_id(user.id, determined_role, db=db)
+                        # Update the user object in memory as well,
+                        # to avoid problems with the ENABLE_OAUTH_GROUP_MANAGEMENT check below
+                        user.role = determined_role
+                    # Update profile picture if enabled and different from current
+                    if auth_manager_config.OAUTH_UPDATE_PICTURE_ON_LOGIN:
+                        picture_claim = auth_manager_config.OAUTH_PICTURE_CLAIM
+                        if picture_claim:
+                            new_picture_url = user_data.get(
+                                picture_claim,
+                                OAUTH_PROVIDERS[provider].get("picture_url", ""),
                             )
-                            log.debug(f"Updated profile picture for user {user.email}")
+                            processed_picture_url = await self._process_picture_url(
+                                new_picture_url, token.get("access_token")
+                            )
+                            if processed_picture_url != user.profile_image_url:
+                                Users.update_user_profile_image_url_by_id(
+                                    user.id, processed_picture_url, db=db
+                                )
+                                log.debug(
+                                    f"Updated profile picture for user {user.email}"
+                                )
             else:
                 # If the user does not exist, check if signups are enabled
                 if auth_manager_config.ENABLE_OAUTH_SIGNUP:
+                    allowed_signup_providers = _resolve_allowed_providers(
+                        request.app.state.config.OAUTH_ALLOWED_SIGNUP_PROVIDERS
+                    )
+                    if provider not in allowed_signup_providers:
+                        raise HTTPException(
+                            status_code=status.HTTP_403_FORBIDDEN,
+                            detail=ERROR_MESSAGES.ACCESS_PROHIBITED,
+                        )
+
                     # Check if an existing user with the same email already exists
                     existing_user = Users.get_user_by_email(email, db=db)
                     if existing_user:
                         raise HTTPException(400, detail=ERROR_MESSAGES.EMAIL_TAKEN)
+
+                    if (
+                        request.app.state.config.ENABLE_INVITE_ONLY_AUTH
+                        and Users.has_users(db=db)
+                    ):
+                        pending_invite_code = (
+                            request.cookies.get("pending_invite_code", "") or ""
+                        ).strip()
+                        valid_invite, invite_error, _ = consume_invite_code(
+                            request.app.state.config,
+                            pending_invite_code,
+                            consumed_by=email,
+                        )
+                        if not valid_invite:
+                            raise HTTPException(
+                                status_code=status.HTTP_400_BAD_REQUEST,
+                                detail=invite_error,
+                            )
 
                     picture_claim = auth_manager_config.OAUTH_PICTURE_CLAIM
                     if picture_claim:
@@ -1630,6 +1840,7 @@ class OAuthManager:
             )
             if (
                 auth_manager_config.ENABLE_OAUTH_GROUP_MANAGEMENT
+                and not is_oauth_link_flow
                 and user.role != "admin"
             ):
                 self.update_user_groups(
@@ -1650,13 +1861,36 @@ class OAuthManager:
         redirect_base_url = (
             str(request.app.state.config.WEBUI_URL or request.base_url)
         ).rstrip("/")
-        redirect_url = f"{redirect_base_url}/auth"
+        redirect_url = (
+            f"{redirect_base_url}{link_redirect_path}"
+            if is_oauth_link_flow
+            else f"{redirect_base_url}/auth"
+        )
 
         if error_message:
-            redirect_url = f"{redirect_url}?error={error_message}"
-            return RedirectResponse(url=redirect_url, headers=response.headers)
+            redirect_url = _append_query_params(
+                redirect_url,
+                (
+                    {"oauth_link_error": error_message}
+                    if is_oauth_link_flow
+                    else {"error": error_message}
+                ),
+            )
+            redirect_response = RedirectResponse(url=redirect_url, headers=response.headers)
+            redirect_response.delete_cookie("pending_invite_code")
+            redirect_response.delete_cookie("pending_oauth_link_user_id")
+            redirect_response.delete_cookie("pending_oauth_link_redirect")
+            return redirect_response
+
+        if is_oauth_link_flow:
+            redirect_url = _append_query_params(
+                redirect_url, {"oauth_linked": provider}
+            )
 
         response = RedirectResponse(url=redirect_url, headers=response.headers)
+        response.delete_cookie("pending_invite_code")
+        response.delete_cookie("pending_oauth_link_user_id")
+        response.delete_cookie("pending_oauth_link_redirect")
 
         # Set the cookie token
         # Redirect back to the frontend with the JWT token

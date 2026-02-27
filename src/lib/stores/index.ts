@@ -260,6 +260,10 @@ type Config = {
 		enable_api_keys: boolean;
 		enable_signup: boolean;
 		enable_login_form: boolean;
+		enable_password_signup?: boolean;
+		enable_oauth_login?: boolean;
+		enable_oauth_signup?: boolean;
+		enable_invite_only_auth?: boolean;
 		enable_web_search?: boolean;
 		enable_google_drive_integration: boolean;
 		enable_onedrive_integration: boolean;
@@ -278,6 +282,8 @@ type Config = {
 		providers: {
 			[key: string]: string;
 		};
+		allowed_login_providers?: string[];
+		allowed_signup_providers?: string[];
 	};
 	ui?: {
 		pending_user_overlay_title?: string;
@@ -297,4 +303,5 @@ export type SessionUser = {
 	name: string;
 	role: string;
 	profile_image_url: string;
+	oauth?: Record<string, { sub?: string }>;
 };

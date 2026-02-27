@@ -339,6 +339,64 @@ ENABLE_OAUTH_SIGNUP = PersistentConfig(
     os.environ.get("ENABLE_OAUTH_SIGNUP", "False").lower() == "true",
 )
 
+ENABLE_OAUTH_LOGIN = PersistentConfig(
+    "ENABLE_OAUTH_LOGIN",
+    "oauth.enable_login",
+    os.environ.get("ENABLE_OAUTH_LOGIN", "True").lower() == "true",
+)
+
+oauth_allowed_login_providers = os.environ.get("OAUTH_ALLOWED_LOGIN_PROVIDERS", "").strip()
+if oauth_allowed_login_providers:
+    try:
+        oauth_allowed_login_providers = json.loads(oauth_allowed_login_providers)
+    except Exception:
+        oauth_allowed_login_providers = [
+            provider.strip().lower()
+            for provider in oauth_allowed_login_providers.split(",")
+            if provider.strip()
+        ]
+    if not isinstance(oauth_allowed_login_providers, list):
+        oauth_allowed_login_providers = []
+    oauth_allowed_login_providers = [
+        str(provider).strip().lower()
+        for provider in oauth_allowed_login_providers
+        if str(provider).strip()
+    ]
+else:
+    oauth_allowed_login_providers = None
+
+OAUTH_ALLOWED_LOGIN_PROVIDERS = PersistentConfig(
+    "OAUTH_ALLOWED_LOGIN_PROVIDERS",
+    "auth.oauth.allowed_login_providers",
+    oauth_allowed_login_providers,
+)
+
+oauth_allowed_signup_providers = os.environ.get("OAUTH_ALLOWED_SIGNUP_PROVIDERS", "").strip()
+if oauth_allowed_signup_providers:
+    try:
+        oauth_allowed_signup_providers = json.loads(oauth_allowed_signup_providers)
+    except Exception:
+        oauth_allowed_signup_providers = [
+            provider.strip().lower()
+            for provider in oauth_allowed_signup_providers.split(",")
+            if provider.strip()
+        ]
+    if not isinstance(oauth_allowed_signup_providers, list):
+        oauth_allowed_signup_providers = []
+    oauth_allowed_signup_providers = [
+        str(provider).strip().lower()
+        for provider in oauth_allowed_signup_providers
+        if str(provider).strip()
+    ]
+else:
+    oauth_allowed_signup_providers = None
+
+OAUTH_ALLOWED_SIGNUP_PROVIDERS = PersistentConfig(
+    "OAUTH_ALLOWED_SIGNUP_PROVIDERS",
+    "auth.oauth.allowed_signup_providers",
+    oauth_allowed_signup_providers,
+)
+
 
 OAUTH_MERGE_ACCOUNTS_BY_EMAIL = PersistentConfig(
     "OAUTH_MERGE_ACCOUNTS_BY_EMAIL",
@@ -347,6 +405,12 @@ OAUTH_MERGE_ACCOUNTS_BY_EMAIL = PersistentConfig(
 )
 
 OAUTH_PROVIDERS = {}
+
+GOOGLE_OAUTH_ENABLED = PersistentConfig(
+    "GOOGLE_OAUTH_ENABLED",
+    "oauth.google.enabled",
+    os.environ.get("GOOGLE_OAUTH_ENABLED", "True").lower() == "true",
+)
 
 GOOGLE_CLIENT_ID = PersistentConfig(
     "GOOGLE_CLIENT_ID",
@@ -367,10 +431,25 @@ GOOGLE_OAUTH_SCOPE = PersistentConfig(
     os.environ.get("GOOGLE_OAUTH_SCOPE", "openid email profile"),
 )
 
+GOOGLE_SERVER_METADATA_URL = PersistentConfig(
+    "GOOGLE_SERVER_METADATA_URL",
+    "oauth.google.server_metadata_url",
+    os.environ.get(
+        "GOOGLE_SERVER_METADATA_URL",
+        "https://accounts.google.com/.well-known/openid-configuration",
+    ),
+)
+
 GOOGLE_REDIRECT_URI = PersistentConfig(
     "GOOGLE_REDIRECT_URI",
     "oauth.google.redirect_uri",
     os.environ.get("GOOGLE_REDIRECT_URI", ""),
+)
+
+MICROSOFT_OAUTH_ENABLED = PersistentConfig(
+    "MICROSOFT_OAUTH_ENABLED",
+    "oauth.microsoft.enabled",
+    os.environ.get("MICROSOFT_OAUTH_ENABLED", "True").lower() == "true",
 )
 
 MICROSOFT_CLIENT_ID = PersistentConfig(
@@ -421,6 +500,12 @@ MICROSOFT_REDIRECT_URI = PersistentConfig(
     os.environ.get("MICROSOFT_REDIRECT_URI", ""),
 )
 
+GITHUB_OAUTH_ENABLED = PersistentConfig(
+    "GITHUB_OAUTH_ENABLED",
+    "oauth.github.enabled",
+    os.environ.get("GITHUB_OAUTH_ENABLED", "True").lower() == "true",
+)
+
 GITHUB_CLIENT_ID = PersistentConfig(
     "GITHUB_CLIENT_ID",
     "oauth.github.client_id",
@@ -443,6 +528,42 @@ GITHUB_CLIENT_REDIRECT_URI = PersistentConfig(
     "GITHUB_CLIENT_REDIRECT_URI",
     "oauth.github.redirect_uri",
     os.environ.get("GITHUB_CLIENT_REDIRECT_URI", ""),
+)
+
+GITHUB_ACCESS_TOKEN_URL = PersistentConfig(
+    "GITHUB_ACCESS_TOKEN_URL",
+    "oauth.github.access_token_url",
+    os.environ.get(
+        "GITHUB_ACCESS_TOKEN_URL",
+        "https://github.com/login/oauth/access_token",
+    ),
+)
+
+GITHUB_AUTHORIZE_URL = PersistentConfig(
+    "GITHUB_AUTHORIZE_URL",
+    "oauth.github.authorize_url",
+    os.environ.get(
+        "GITHUB_AUTHORIZE_URL",
+        "https://github.com/login/oauth/authorize",
+    ),
+)
+
+GITHUB_API_BASE_URL = PersistentConfig(
+    "GITHUB_API_BASE_URL",
+    "oauth.github.api_base_url",
+    os.environ.get("GITHUB_API_BASE_URL", "https://api.github.com"),
+)
+
+GITHUB_USERINFO_ENDPOINT = PersistentConfig(
+    "GITHUB_USERINFO_ENDPOINT",
+    "oauth.github.userinfo_endpoint",
+    os.environ.get("GITHUB_USERINFO_ENDPOINT", "https://api.github.com/user"),
+)
+
+OIDC_OAUTH_ENABLED = PersistentConfig(
+    "OIDC_OAUTH_ENABLED",
+    "oauth.oidc.enabled",
+    os.environ.get("OIDC_OAUTH_ENABLED", "True").lower() == "true",
 )
 
 OAUTH_CLIENT_ID = PersistentConfig(
@@ -530,6 +651,12 @@ OAUTH_GROUPS_CLAIM = PersistentConfig(
     os.environ.get("OAUTH_GROUPS_CLAIM", os.environ.get("OAUTH_GROUP_CLAIM", "groups")),
 )
 
+FEISHU_OAUTH_ENABLED = PersistentConfig(
+    "FEISHU_OAUTH_ENABLED",
+    "oauth.feishu.enabled",
+    os.environ.get("FEISHU_OAUTH_ENABLED", "True").lower() == "true",
+)
+
 FEISHU_CLIENT_ID = PersistentConfig(
     "FEISHU_CLIENT_ID",
     "oauth.feishu.client_id",
@@ -552,6 +679,93 @@ FEISHU_REDIRECT_URI = PersistentConfig(
     "FEISHU_REDIRECT_URI",
     "oauth.feishu.redirect_uri",
     os.environ.get("FEISHU_REDIRECT_URI", ""),
+)
+
+FEISHU_ACCESS_TOKEN_URL = PersistentConfig(
+    "FEISHU_ACCESS_TOKEN_URL",
+    "oauth.feishu.access_token_url",
+    os.environ.get(
+        "FEISHU_ACCESS_TOKEN_URL",
+        "https://open.feishu.cn/open-apis/authen/v2/oauth/token",
+    ),
+)
+
+FEISHU_AUTHORIZE_URL = PersistentConfig(
+    "FEISHU_AUTHORIZE_URL",
+    "oauth.feishu.authorize_url",
+    os.environ.get(
+        "FEISHU_AUTHORIZE_URL",
+        "https://accounts.feishu.cn/open-apis/authen/v1/authorize",
+    ),
+)
+
+FEISHU_API_BASE_URL = PersistentConfig(
+    "FEISHU_API_BASE_URL",
+    "oauth.feishu.api_base_url",
+    os.environ.get("FEISHU_API_BASE_URL", "https://open.feishu.cn/open-apis"),
+)
+
+FEISHU_USERINFO_ENDPOINT = PersistentConfig(
+    "FEISHU_USERINFO_ENDPOINT",
+    "oauth.feishu.userinfo_endpoint",
+    os.environ.get(
+        "FEISHU_USERINFO_ENDPOINT",
+        "https://open.feishu.cn/open-apis/authen/v1/user_info",
+    ),
+)
+
+DISCORD_OAUTH_ENABLED = PersistentConfig(
+    "DISCORD_OAUTH_ENABLED",
+    "oauth.discord.enabled",
+    os.environ.get("DISCORD_OAUTH_ENABLED", "True").lower() == "true",
+)
+
+DISCORD_CLIENT_ID = PersistentConfig(
+    "DISCORD_CLIENT_ID",
+    "oauth.discord.client_id",
+    os.environ.get("DISCORD_CLIENT_ID", ""),
+)
+
+DISCORD_CLIENT_SECRET = PersistentConfig(
+    "DISCORD_CLIENT_SECRET",
+    "oauth.discord.client_secret",
+    os.environ.get("DISCORD_CLIENT_SECRET", ""),
+)
+
+DISCORD_OAUTH_SCOPE = PersistentConfig(
+    "DISCORD_OAUTH_SCOPE",
+    "oauth.discord.scope",
+    os.environ.get("DISCORD_OAUTH_SCOPE", "identify email"),
+)
+
+DISCORD_REDIRECT_URI = PersistentConfig(
+    "DISCORD_REDIRECT_URI",
+    "oauth.discord.redirect_uri",
+    os.environ.get("DISCORD_REDIRECT_URI", ""),
+)
+
+DISCORD_ACCESS_TOKEN_URL = PersistentConfig(
+    "DISCORD_ACCESS_TOKEN_URL",
+    "oauth.discord.access_token_url",
+    os.environ.get("DISCORD_ACCESS_TOKEN_URL", "https://discord.com/api/oauth2/token"),
+)
+
+DISCORD_AUTHORIZE_URL = PersistentConfig(
+    "DISCORD_AUTHORIZE_URL",
+    "oauth.discord.authorize_url",
+    os.environ.get("DISCORD_AUTHORIZE_URL", "https://discord.com/oauth2/authorize"),
+)
+
+DISCORD_API_BASE_URL = PersistentConfig(
+    "DISCORD_API_BASE_URL",
+    "oauth.discord.api_base_url",
+    os.environ.get("DISCORD_API_BASE_URL", "https://discord.com/api"),
+)
+
+DISCORD_USERINFO_ENDPOINT = PersistentConfig(
+    "DISCORD_USERINFO_ENDPOINT",
+    "oauth.discord.userinfo_endpoint",
+    os.environ.get("DISCORD_USERINFO_ENDPOINT", "https://discord.com/api/users/@me"),
 )
 
 ENABLE_OAUTH_ROLE_MANAGEMENT = PersistentConfig(
@@ -656,14 +870,14 @@ OAUTH_AUDIENCE = PersistentConfig(
 
 def load_oauth_providers():
     OAUTH_PROVIDERS.clear()
-    if GOOGLE_CLIENT_ID.value and GOOGLE_CLIENT_SECRET.value:
+    if GOOGLE_OAUTH_ENABLED.value and GOOGLE_CLIENT_ID.value and GOOGLE_CLIENT_SECRET.value:
 
         def google_oauth_register(oauth: OAuth):
             client = oauth.register(
                 name="google",
                 client_id=GOOGLE_CLIENT_ID.value,
                 client_secret=GOOGLE_CLIENT_SECRET.value,
-                server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
+                server_metadata_url=GOOGLE_SERVER_METADATA_URL.value,
                 client_kwargs={
                     "scope": GOOGLE_OAUTH_SCOPE.value,
                     **(
@@ -682,6 +896,8 @@ def load_oauth_providers():
         }
 
     if (
+        MICROSOFT_OAUTH_ENABLED.value
+        and
         MICROSOFT_CLIENT_ID.value
         and MICROSOFT_CLIENT_SECRET.value
         and MICROSOFT_CLIENT_TENANT_ID.value
@@ -711,17 +927,17 @@ def load_oauth_providers():
             "register": microsoft_oauth_register,
         }
 
-    if GITHUB_CLIENT_ID.value and GITHUB_CLIENT_SECRET.value:
+    if GITHUB_OAUTH_ENABLED.value and GITHUB_CLIENT_ID.value and GITHUB_CLIENT_SECRET.value:
 
         def github_oauth_register(oauth: OAuth):
             client = oauth.register(
                 name="github",
                 client_id=GITHUB_CLIENT_ID.value,
                 client_secret=GITHUB_CLIENT_SECRET.value,
-                access_token_url="https://github.com/login/oauth/access_token",
-                authorize_url="https://github.com/login/oauth/authorize",
-                api_base_url="https://api.github.com",
-                userinfo_endpoint="https://api.github.com/user",
+                access_token_url=GITHUB_ACCESS_TOKEN_URL.value,
+                authorize_url=GITHUB_AUTHORIZE_URL.value,
+                api_base_url=GITHUB_API_BASE_URL.value,
+                userinfo_endpoint=GITHUB_USERINFO_ENDPOINT.value,
                 client_kwargs={
                     "scope": GITHUB_CLIENT_SCOPE.value,
                     **(
@@ -741,6 +957,8 @@ def load_oauth_providers():
         }
 
     if (
+        OIDC_OAUTH_ENABLED.value
+        and
         OAUTH_CLIENT_ID.value
         and (OAUTH_CLIENT_SECRET.value or OAUTH_CODE_CHALLENGE_METHOD.value)
         and OPENID_PROVIDER_URL.value
@@ -788,17 +1006,17 @@ def load_oauth_providers():
             "register": oidc_oauth_register,
         }
 
-    if FEISHU_CLIENT_ID.value and FEISHU_CLIENT_SECRET.value:
+    if FEISHU_OAUTH_ENABLED.value and FEISHU_CLIENT_ID.value and FEISHU_CLIENT_SECRET.value:
 
         def feishu_oauth_register(oauth: OAuth):
             client = oauth.register(
                 name="feishu",
                 client_id=FEISHU_CLIENT_ID.value,
                 client_secret=FEISHU_CLIENT_SECRET.value,
-                access_token_url="https://open.feishu.cn/open-apis/authen/v2/oauth/token",
-                authorize_url="https://accounts.feishu.cn/open-apis/authen/v1/authorize",
-                api_base_url="https://open.feishu.cn/open-apis",
-                userinfo_endpoint="https://open.feishu.cn/open-apis/authen/v1/user_info",
+                access_token_url=FEISHU_ACCESS_TOKEN_URL.value,
+                authorize_url=FEISHU_AUTHORIZE_URL.value,
+                api_base_url=FEISHU_API_BASE_URL.value,
+                userinfo_endpoint=FEISHU_USERINFO_ENDPOINT.value,
                 client_kwargs={
                     "scope": FEISHU_OAUTH_SCOPE.value,
                     **(
@@ -816,15 +1034,47 @@ def load_oauth_providers():
             "sub_claim": "user_id",
         }
 
+    if DISCORD_OAUTH_ENABLED.value and DISCORD_CLIENT_ID.value and DISCORD_CLIENT_SECRET.value:
+
+        def discord_oauth_register(oauth: OAuth):
+            client = oauth.register(
+                name="discord",
+                client_id=DISCORD_CLIENT_ID.value,
+                client_secret=DISCORD_CLIENT_SECRET.value,
+                access_token_url=DISCORD_ACCESS_TOKEN_URL.value,
+                authorize_url=DISCORD_AUTHORIZE_URL.value,
+                api_base_url=DISCORD_API_BASE_URL.value,
+                userinfo_endpoint=DISCORD_USERINFO_ENDPOINT.value,
+                client_kwargs={
+                    "scope": DISCORD_OAUTH_SCOPE.value,
+                    **(
+                        {"timeout": int(OAUTH_TIMEOUT.value)}
+                        if OAUTH_TIMEOUT.value
+                        else {}
+                    ),
+                },
+                redirect_uri=DISCORD_REDIRECT_URI.value,
+            )
+            return client
+
+        OAUTH_PROVIDERS["discord"] = {
+            "name": "Discord",
+            "redirect_uri": DISCORD_REDIRECT_URI.value,
+            "register": discord_oauth_register,
+            "sub_claim": "id",
+        }
+
     configured_providers = []
-    if GOOGLE_CLIENT_ID.value:
+    if GOOGLE_OAUTH_ENABLED.value and GOOGLE_CLIENT_ID.value:
         configured_providers.append("Google")
-    if MICROSOFT_CLIENT_ID.value:
+    if MICROSOFT_OAUTH_ENABLED.value and MICROSOFT_CLIENT_ID.value:
         configured_providers.append("Microsoft")
-    if GITHUB_CLIENT_ID.value:
+    if GITHUB_OAUTH_ENABLED.value and GITHUB_CLIENT_ID.value:
         configured_providers.append("GitHub")
-    if FEISHU_CLIENT_ID.value:
+    if FEISHU_OAUTH_ENABLED.value and FEISHU_CLIENT_ID.value:
         configured_providers.append("Feishu")
+    if DISCORD_OAUTH_ENABLED.value and DISCORD_CLIENT_ID.value:
+        configured_providers.append("Discord")
 
     if configured_providers and not OPENID_PROVIDER_URL.value:
         provider_list = ", ".join(configured_providers)
@@ -1195,7 +1445,91 @@ ENABLE_LOGIN_FORM = PersistentConfig(
     os.environ.get("ENABLE_LOGIN_FORM", "True").lower() == "true",
 )
 
+ENABLE_PASSWORD_SIGNUP = PersistentConfig(
+    "ENABLE_PASSWORD_SIGNUP",
+    "auth.password.enable_signup",
+    os.environ.get("ENABLE_PASSWORD_SIGNUP", "True").lower() == "true",
+)
+
 ENABLE_PASSWORD_AUTH = os.environ.get("ENABLE_PASSWORD_AUTH", "True").lower() == "true"
+
+ENABLE_INVITE_ONLY_AUTH = PersistentConfig(
+    "ENABLE_INVITE_ONLY_AUTH",
+    "auth.invite.enable",
+    os.environ.get("ENABLE_INVITE_ONLY_AUTH", "False").lower() == "true",
+)
+
+INVITE_CREATOR_SCOPE = PersistentConfig(
+    "INVITE_CREATOR_SCOPE",
+    "auth.invite.creator_scope",
+    os.environ.get("INVITE_CREATOR_SCOPE", "admin"),
+)
+
+invite_creator_group_ids = os.environ.get("INVITE_CREATOR_GROUP_IDS", "[]")
+try:
+    invite_creator_group_ids = json.loads(invite_creator_group_ids)
+except Exception:
+    invite_creator_group_ids = [
+        group_id.strip() for group_id in invite_creator_group_ids.split(",") if group_id.strip()
+    ]
+if not isinstance(invite_creator_group_ids, list):
+    invite_creator_group_ids = []
+
+INVITE_CREATOR_GROUP_IDS = PersistentConfig(
+    "INVITE_CREATOR_GROUP_IDS",
+    "auth.invite.creator_group_ids",
+    invite_creator_group_ids,
+)
+
+INVITE_CREATOR_COOLDOWN_SECONDS = PersistentConfig(
+    "INVITE_CREATOR_COOLDOWN_SECONDS",
+    "auth.invite.creator_cooldown_seconds",
+    int(os.environ.get("INVITE_CREATOR_COOLDOWN_SECONDS", "3600")),
+)
+
+INVITE_CODE_LENGTH = PersistentConfig(
+    "INVITE_CODE_LENGTH",
+    "auth.invite.code_length",
+    int(os.environ.get("INVITE_CODE_LENGTH", "8")),
+)
+
+INVITE_CODE_TTL_SECONDS = PersistentConfig(
+    "INVITE_CODE_TTL_SECONDS",
+    "auth.invite.code_ttl_seconds",
+    int(os.environ.get("INVITE_CODE_TTL_SECONDS", "604800")),
+)
+
+INVITE_CODE_PREFIX = PersistentConfig(
+    "INVITE_CODE_PREFIX",
+    "auth.invite.code_prefix",
+    os.environ.get("INVITE_CODE_PREFIX", ""),
+)
+
+INVITE_CODE_REUSABLE = PersistentConfig(
+    "INVITE_CODE_REUSABLE",
+    "auth.invite.code_reusable",
+    os.environ.get("INVITE_CODE_REUSABLE", "False").lower() == "true",
+)
+
+INVITE_CODE_MAX_USES = PersistentConfig(
+    "INVITE_CODE_MAX_USES",
+    "auth.invite.code_max_uses",
+    int(os.environ.get("INVITE_CODE_MAX_USES", "1")),
+)
+
+invite_codes = os.environ.get("INVITE_CODES", "[]")
+try:
+    invite_codes = json.loads(invite_codes)
+except Exception:
+    invite_codes = []
+if not isinstance(invite_codes, list):
+    invite_codes = []
+
+INVITE_CODES = PersistentConfig(
+    "INVITE_CODES",
+    "auth.invite.codes",
+    invite_codes,
+)
 
 DEFAULT_LOCALE = PersistentConfig(
     "DEFAULT_LOCALE",

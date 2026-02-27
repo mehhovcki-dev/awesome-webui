@@ -43,18 +43,38 @@
 + Добавлен «Дополнительный JSON», который добавляется к запросу
 ```
 
+### #3. Вкладка «Awesome WebUI» (Authorization + SSO Management)
+![preview of authorization settings in Awesome WebUI tab](preview/image3.png)
+```diff
++ Добавлена отдельная админ-вкладка "Awesome WebUI" с разделами "Authorization" и "SSO Management"
++ Добавлены переключатели способов авторизации: регистрация, Email+Password signup, SSO-вход и создание аккаунтов через SSO
++ Добавлен контроль SSO-провайдеров для входа/регистрации с быстрыми действиями "All/None"
+```
+![preview of invite-only settings in Awesome WebUI tab](preview/image4.png)
+```diff
++ Добавлены настройки invite-only доступа с выбором, кто может создавать коды (Admin Only / Selected Groups / All Users)
++ Добавлены параметры инвайтов: длина кода, срок жизни (пресеты + своя дата/время), префикс, reusable и max uses
++ Добавлено управление кодами приглашений (создать, скопировать, удалить)
+```
+![preview of sso management settings in Awesome WebUI tab](preview/image5.png)
+```diff
++ Добавлен полный раздел SSO Management для настройки OAuth-провайдеров прямо из админки
++ Добавлены переключатели и редактирование OAuth-полей (Google, Microsoft, GitHub, Discord, OIDC, Feishu)
++ Добавлены расширенные параметры OAuth (merge by email, timeout, audience)
+```
+
 ## TODO
 Список улучшений и QoL-изменений, которые уже запланированы. Если хотите предложить идею для Awesome WebUI — [напишите её здесь](https://github.com/mehhovcki-dev/awesome-webui/discussions/categories/ideas).
 
 Приоритеты: `HIGH` (скоро), `MEDIUM`, `LOW`, `XLOW` (позже).
 
 ### Админ-панель
-- [ ] `HIGH` Система инвайт-кодов
-- [ ] `HIGH` Возможность менять параметры регистрации из веб-интерфейса (OAuth-провайдеры и т.д.)
+- [x] `HIGH` Система инвайт-кодов
+- [x] `HIGH` Возможность менять параметры регистрации из веб-интерфейса (OAuth-провайдеры и т.д.)
 - [ ] `MEDIUM` Системное объявление и MOTD
 - [ ] `LOW` Кастомные эмодзи
 - [ ] `LOW` Звуки уведомлений для каналов
-- [ ] `LOW` Discord OAuth
+- [x] `LOW` Discord OAuth
 
 ### Пользовательский интерфейс
 - [ ] `LOW` Добавить GIF в каналы

@@ -19,7 +19,27 @@ So, I am here to fix that. Awesome WebUI is a **fork** of [Open WebUI](https://g
 + Multi-select now supports bulk changes for icon, name, access, and enable/disable state
 ```
 
-### #2. Connections Tab
+### #2. Awesome WebUI Tab (Authorization + SSO Management)
+![preview of authorization settings in Awesome WebUI tab](preview/image3.png)
+```diff
++ Added a dedicated "Awesome WebUI" admin tab with "Authorization" and "SSO Management" sections
++ Added auth method controls: Registration, Email+Password signup, SSO logins, and SSO account creation
++ Added provider-level SSO access control for login/signup with quick "All/None" actions
+```
+![preview of invite-only settings in Awesome WebUI tab](preview/image4.png)
+```diff
++ Added invite-only access controls with creator scope (Admin Only / Selected Groups / All Users)
++ Added invite defaults: code length, expiry presets + custom date/time, prefix, reusable toggle, and max uses
++ Added invite code management actions (generate, copy, delete)
+```
+![preview of sso management settings in Awesome WebUI tab](preview/image5.png)
+```diff
++ Added full SSO Management for OAuth providers directly from admin UI
++ Added provider toggles and editable OAuth settings (Google, Microsoft, GitHub, Discord, OIDC, Feishu)
++ Added advanced OAuth runtime settings (merge by email, timeout, audience)
+```
+
+### #3. Connections Tab
 <small>
 * - "provider" is used here as another term for "connection".
 <br>¹ - untested feature, please report any issues.
@@ -45,12 +65,12 @@ Planned improvements and QoL changes. If you want to suggest something for Aweso
 Priority guide: `HIGH` (soon), `MEDIUM`, `LOW`, `XLOW` (later).
 
 ### Admin Panel
-- [ ] `HIGH` Invite-code system
-- [ ] `HIGH` Ability to change registration from the website (OAuth providers, etc.)
+- [x] `HIGH` Invite-code system
+- [x] `HIGH` Ability to change registration from the website (OAuth providers, etc.)
 - [ ] `MEDIUM` System notice and MOTD
 - [ ] `LOW` Custom emojis
 - [ ] `LOW` Notification sounds for channels
-- [ ] `LOW` Discord OAuth
+- [x] `LOW` Discord OAuth
 
 ### User Interface
 - [ ] `LOW` Add GIFs to channels

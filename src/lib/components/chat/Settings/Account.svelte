@@ -7,22 +7,18 @@
 	import { WEBUI_BASE_URL } from '$lib/constants';
 
 	import UpdatePassword from './Account/UpdatePassword.svelte';
-	import { getGravatarUrl } from '$lib/apis/utils';
-	import { generateInitialsImage, canvasPixelTest } from '$lib/utils';
+	import { generateInitialsImage } from '$lib/utils';
 	import { copyToClipboard } from '$lib/utils';
 	import Plus from '$lib/components/icons/Plus.svelte';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import SensitiveInput from '$lib/components/common/SensitiveInput.svelte';
 	import Textarea from '$lib/components/common/Textarea.svelte';
-	import User from '$lib/components/icons/User.svelte';
 	import UserProfileImage from './Account/UserProfileImage.svelte';
 
 	const i18n = getContext('i18n');
 
-	export let saveHandler: Function;
-	export let saveSettings: Function;
-
-	let loaded = false;
+	export let saveHandler: () => void;
+	export let saveSettings: (settingsUpdate: Record<string, unknown>) => void | Promise<void>;
 
 	let profileImageUrl = '';
 	let name = '';
@@ -39,7 +35,83 @@
 
 	let APIKey = '';
 	let APIKeyCopied = false;
-	let profileImageInputElement: HTMLInputElement;
+	let availableOAuthProviders: { id: string; label: string }[] = [];
+
+	const getAllowedOAuthProviderIds = () => {
+		const configuredProviderIds = Object.keys($config?.oauth?.providers ?? {}).map((providerId) =>
+			String(providerId).trim().toLowerCase()
+		);
+		const rawAllowedProviders = $config?.oauth?.allowed_login_providers;
+		if (!Array.isArray(rawAllowedProviders)) {
+			return configuredProviderIds;
+		}
+
+		const configuredProviderIdSet = new Set(configuredProviderIds);
+		return rawAllowedProviders
+			.map((providerId) => String(providerId).trim().toLowerCase())
+			.filter((providerId) => configuredProviderIdSet.has(providerId));
+	};
+
+	const getOAuthProviderLabel = (providerId: string) => {
+		const providerMap = $config?.oauth?.providers ?? {};
+		return String(providerMap?.[providerId] ?? providerId);
+	};
+
+	const getLinkedOAuthProviders = () => {
+		const oauth = $user?.oauth;
+		if (!oauth || typeof oauth !== 'object') {
+			return {};
+		}
+		return oauth as Record<string, { sub?: string }>;
+	};
+
+	const isOAuthProviderLinked = (providerId: string) =>
+		Boolean(getLinkedOAuthProviders()?.[providerId]?.sub);
+
+	const connectOAuthProvider = (providerId: string) => {
+		if (!providerId) {
+			return;
+		}
+
+		const redirectPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+		window.location.href = `${WEBUI_BASE_URL}/oauth/${encodeURIComponent(providerId)}/login?mode=connect&redirect=${encodeURIComponent(redirectPath)}`;
+	};
+
+	const handleOAuthLinkStatus = () => {
+		const currentUrl = new URL(window.location.href);
+		const linkedProvider = (currentUrl.searchParams.get('oauth_linked') || '').trim().toLowerCase();
+		const linkError = (currentUrl.searchParams.get('oauth_link_error') || '').trim();
+
+		if (linkedProvider) {
+			toast.success(
+				$i18n.t('Connected {{provider}} to your account.', {
+					provider: getOAuthProviderLabel(linkedProvider)
+				})
+			);
+		}
+
+		if (linkError) {
+			toast.error(linkError);
+		}
+
+		if (linkedProvider || linkError) {
+			currentUrl.searchParams.delete('oauth_linked');
+			currentUrl.searchParams.delete('oauth_link_error');
+			const cleanUrl = `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`;
+			window.history.replaceState({}, '', cleanUrl);
+		}
+	};
+
+	$: {
+		const configuredProviders = Object.entries($config?.oauth?.providers ?? {}).map(
+			([id, label]) => ({
+				id: String(id).trim().toLowerCase(),
+				label: String(label || id)
+			})
+		);
+		const allowedProviderIds = new Set(getAllowedOAuthProviderIds());
+		availableOAuthProviders = configuredProviders.filter(({ id }) => allowedProviderIds.has(id));
+	}
 
 	const submitHandler = async () => {
 		if (name !== $user?.name) {
@@ -90,6 +162,8 @@
 	};
 
 	onMount(async () => {
+		handleOAuthLinkStatus();
+
 		const user = await getSessionUser(localStorage.token).catch((error) => {
 			toast.error(`${error}`);
 			return null;
@@ -120,7 +194,6 @@
 			});
 		}
 
-		loaded = true;
 	});
 </script>
 
@@ -179,9 +252,7 @@
 									class="w-full text-sm dark:text-gray-300 bg-transparent outline-hidden"
 									bind:value={_gender}
 									aria-label={$i18n.t('Gender')}
-									on:change={(e) => {
-										console.log(_gender);
-
+									on:change={() => {
 										if (_gender === 'custom') {
 											// Handle custom gender input
 											gender = '';
@@ -251,6 +322,42 @@
 		{#if $config?.features.enable_login_form}
 			<div class="mt-2">
 				<UpdatePassword />
+			</div>
+		{/if}
+
+		{#if ($config?.features?.enable_oauth_login ?? true) && availableOAuthProviders.length > 0}
+			<div class="mt-4">
+				<div class="text-sm font-medium">{$i18n.t('Connected SSO Providers')}</div>
+				<div class="text-xs text-gray-500 mt-0.5">
+					{$i18n.t(
+						'Link additional SSO providers to this account so you can sign in with any linked provider.'
+					)}
+				</div>
+
+				<div class="mt-2 space-y-2">
+					{#each availableOAuthProviders as provider}
+						<div
+							class="rounded-lg border border-gray-100 dark:border-gray-850/80 px-3 py-2.5 flex items-center justify-between"
+						>
+							<div class="text-sm">{provider.label}</div>
+							{#if isOAuthProviderLinked(provider.id)}
+								<span
+									class="text-xs font-medium px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+								>
+									{$i18n.t('Linked')}
+								</span>
+							{:else}
+								<button
+									type="button"
+									class="text-xs font-medium px-2.5 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-850 dark:hover:bg-gray-800 transition"
+									on:click={() => connectOAuthProvider(provider.id)}
+								>
+									{$i18n.t('Connect')}
+								</button>
+							{/if}
+						</div>
+					{/each}
+				</div>
 			</div>
 		{/if}
 
