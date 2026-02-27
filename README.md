@@ -5,7 +5,7 @@
 
 > "I wish using Open WebUI sucked a little less!"
 
-So, I am here to fix that. Awesome WebUI is a **fork** of [Open WebUI](https://github.com/open-webui/open-webui) focused on improving the experience for both admins and users. Let us get into the details.
+So, I am here to fix that. Awesome WebUI is a **fork** of [Open WebUI](https://github.com/open-webui/open-webui) focused on improving the experience for both admins and users. Let us get into the awesome changes.
 <small>(hah, you see what I did there?)</small>
 
 # List of Changes
