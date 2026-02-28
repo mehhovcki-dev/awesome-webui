@@ -39,6 +39,23 @@ So, I am here to fix that. Awesome WebUI is a **fork** of [Open WebUI](https://g
 + Added advanced OAuth runtime settings (merge by email, timeout, audience)
 ```
 
+### #2.1 Notices (System Notice + MOTD)
+![preview of notices interface in Awesome WebUI](preview/image6.png)
+```diff
++ Added a "Notices" section inside Awesome WebUI for managing guest and user-facing notifications
++ Added Guest Notification controls (enable/disable, custom title, custom description with Markdown support)
++ Added MOTD controls (enable/disable and custom MOTD text) for signed-in users
+```
+<p>
+  <img src="preview/image7.png" alt="guest notification showcase on auth page" width="49%" />
+  <img src="preview/image8.png" alt="motd showcase for signed-in users" width="49%" />
+</p>
+
+```diff
++ Guest Notification now appears above the sign-in/sign-up header for unauthenticated users
++ MOTD appears as a bottom-right message card for registered users with dismiss actions
+```
+
 ### #3. Connections Tab
 <small>
 * - "provider" is used here as another term for "connection".
@@ -67,7 +84,7 @@ Priority guide: `HIGH` (soon), `MEDIUM`, `LOW`, `XLOW` (later).
 ### Admin Panel
 - [x] `HIGH` Invite-code system
 - [x] `HIGH` Ability to change registration from the website (OAuth providers, etc.)
-- [ ] `MEDIUM` System notice and MOTD
+- [x] `MEDIUM` System notice and MOTD
 - [ ] `LOW` Custom emojis
 - [ ] `LOW` Notification sounds for channels
 - [x] `LOW` Discord OAuth

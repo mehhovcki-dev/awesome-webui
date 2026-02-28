@@ -47,6 +47,20 @@
 		mode = $config?.features.enable_ldap ? 'ldap' : 'signin';
 	}
 
+	let showGuestNotification = false;
+	let guestNotificationTitle = '';
+	let guestNotificationDescription = '';
+
+	const evaluateGuestNotification = () => {
+		const enabled = Boolean($config?.ui?.system_notice?.enabled ?? false);
+		const title = String($config?.ui?.system_notice?.title ?? '').trim();
+		const description = String($config?.ui?.system_notice?.content ?? '').trim();
+
+		showGuestNotification = enabled && (title.length > 0 || description.length > 0);
+		guestNotificationTitle = title || 'Notice';
+		guestNotificationDescription = description;
+	};
+
 	const setSessionUser = async (sessionUser, redirectPath: string | null = null) => {
 		if (sessionUser) {
 			console.log(sessionUser);
@@ -165,6 +179,7 @@
 	};
 
 	$: visibleOAuthProviders = getVisibleOAuthProviders();
+	$: evaluateGuestNotification();
 
 	const oauthCallbackHandler = async () => {
 		// Get the value of the 'token' cookie
@@ -307,6 +322,21 @@
 									submitHandler();
 								}}
 							>
+								{#if showGuestNotification}
+									<div
+										class="mb-4 w-full rounded-2xl border border-gray-200/80 dark:border-gray-800/90 bg-gray-50/80 dark:bg-gray-900/70 p-4 sm:p-5 text-left shadow-sm"
+									>
+										<div class="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">
+											{guestNotificationTitle}
+										</div>
+										{#if guestNotificationDescription}
+											<div class="mt-2 text-sm leading-relaxed text-gray-700 dark:text-gray-300 marked">
+												{@html DOMPurify.sanitize(marked(guestNotificationDescription))}
+											</div>
+										{/if}
+									</div>
+								{/if}
+
 								<div class="mb-1">
 									<div class=" text-2xl font-medium">
 										{#if $config?.onboarding ?? false}
@@ -322,7 +352,7 @@
 
 									{#if $config?.onboarding ?? false}
 										<div class="mt-1 text-xs font-medium text-gray-600 dark:text-gray-500">
-											ⓘ {$WEBUI_NAME}
+											i {$WEBUI_NAME}
 											{$i18n.t(
 												'does not make any external connections, and your data stays securely on your locally hosted server.'
 											)}
@@ -693,5 +723,6 @@
 				</div>
 			</div>
 		{/if}
+
 	{/if}
 </div>

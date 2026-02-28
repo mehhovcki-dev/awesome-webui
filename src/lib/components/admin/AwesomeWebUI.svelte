@@ -5,6 +5,7 @@
 	import { user } from '$lib/stores';
 
 	import Authorization from './AwesomeWebUI/Authorization.svelte';
+	import Notices from './AwesomeWebUI/Notices.svelte';
 	import SSO from './AwesomeWebUI/SSO.svelte';
 
 	const i18n = getContext('i18n');
@@ -14,7 +15,9 @@
 	$: {
 		const pathParts = $page.url.pathname.split('/');
 		const tabFromPath = pathParts[pathParts.length - 1];
-		selectedTab = ['authorization', 'sso'].includes(tabFromPath) ? tabFromPath : 'authorization';
+		selectedTab = ['authorization', 'notices', 'sso'].includes(tabFromPath)
+			? tabFromPath
+			: 'authorization';
 	}
 
 	$: if (selectedTab) {
@@ -79,6 +82,32 @@
 		</a>
 
 		<a
+			id="notices"
+			href="/admin/awesome-webui/notices"
+			draggable="false"
+			class="px-0.5 py-1 min-w-fit rounded-lg lg:flex-none flex text-right transition select-none {selectedTab ===
+			'notices'
+				? ''
+				: 'text-gray-300 dark:text-gray-600 hover:text-gray-700 dark:hover:text-white'}"
+		>
+			<div class="self-center mr-2">
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					viewBox="0 0 24 24"
+					fill="currentColor"
+					class="size-4"
+				>
+					<path
+						fill-rule="evenodd"
+						d="M2.25 6.75A3.75 3.75 0 0 1 6 3h12a3.75 3.75 0 0 1 3.75 3.75v5.46a3.75 3.75 0 0 1-1.098 2.652l-4.29 4.29a3.75 3.75 0 0 1-2.652 1.098H6a3.75 3.75 0 0 1-3.75-3.75V6.75Zm9.75 3a.75.75 0 0 0-.75.75v3a.75.75 0 1 0 1.5 0v-3a.75.75 0 0 0-.75-.75Zm0-3a.75.75 0 1 0 0 1.5h.008a.75.75 0 1 0 0-1.5H12Z"
+						clip-rule="evenodd"
+					/>
+				</svg>
+			</div>
+			<div class="self-center">{$i18n.t('Notices')}</div>
+		</a>
+
+		<a
 			id="sso"
 			href="/admin/awesome-webui/sso"
 			draggable="false"
@@ -108,6 +137,8 @@
 	>
 		{#if selectedTab === 'authorization'}
 			<Authorization />
+		{:else if selectedTab === 'notices'}
+			<Notices />
 		{:else if selectedTab === 'sso'}
 			<SSO />
 		{/if}

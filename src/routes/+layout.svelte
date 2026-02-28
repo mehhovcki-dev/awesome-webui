@@ -93,10 +93,64 @@
 
 	let showSyncStatsModal = false;
 	let syncStatsEventData = null;
+	let showMotd = false;
 
 	let heartbeatInterval = null;
 
 	const BREAKPOINT = 768;
+
+	const createMotdHash = (input) => {
+		let hash = 0;
+		for (let i = 0; i < input.length; i += 1) {
+			hash = (hash << 5) - hash + input.charCodeAt(i);
+			hash |= 0;
+		}
+		return Math.abs(hash).toString(16);
+	};
+
+	const getMotdState = (motdConfig = null) => {
+		const enabled = Boolean(motdConfig?.enabled ?? false);
+		const title = String(motdConfig?.title ?? '').trim() || 'Message of the day!';
+		const content = String(motdConfig?.content ?? '').trim();
+		const hash = createMotdHash(`${title}\n${content}`);
+		return { enabled, title, content, hash };
+	};
+
+	const evaluateMotdVisibility = (motdConfig = null, userRole = null) => {
+		if (typeof window === 'undefined') {
+			showMotd = false;
+			return;
+		}
+
+		if (!['user', 'admin'].includes(userRole ?? '')) {
+			showMotd = false;
+			return;
+		}
+
+		const motd = getMotdState(motdConfig);
+		if (!motd.enabled) {
+			showMotd = false;
+			return;
+		}
+
+		const ignored = sessionStorage.getItem(`awu.motd.v3.ignore.${motd.hash}`) === '1';
+		const closed = localStorage.getItem(`awu.motd.v3.close.${motd.hash}`) === '1';
+		showMotd = !ignored && !closed;
+	};
+
+	const ignoreMotd = () => {
+		const motd = getMotdState($config?.ui?.motd ?? null);
+		sessionStorage.setItem(`awu.motd.v3.ignore.${motd.hash}`, '1');
+		showMotd = false;
+	};
+
+	const closeMotd = () => {
+		const motd = getMotdState($config?.ui?.motd ?? null);
+		localStorage.setItem(`awu.motd.v3.close.${motd.hash}`, '1');
+		showMotd = false;
+	};
+
+	$: evaluateMotdVisibility($config?.ui?.motd ?? null, $user?.role ?? null);
 
 	const setupSocket = async (enableWebsocket) => {
 		const _socket = io(`${WEBUI_BASE_URL}` || undefined, {
@@ -909,6 +963,37 @@
 	{:else}
 		<slot />
 	{/if}
+{/if}
+
+{#if showMotd}
+	<div class="fixed right-4 bottom-4 z-[120] w-[calc(100vw-2rem)] max-w-md md:right-6 md:bottom-6">
+		<div
+			class="rounded-xl border border-gray-300/80 bg-white/95 p-4 shadow-2xl dark:border-gray-700 dark:bg-gray-950/95"
+		>
+			<div class="text-xl font-semibold text-gray-900 dark:text-gray-100">
+				{String($config?.ui?.motd?.title || $i18n.t('Message of the day!'))}
+			</div>
+			<div class="mt-3 min-h-16 whitespace-pre-wrap text-sm text-gray-700 dark:text-gray-300">
+				{String($config?.ui?.motd?.content || '')}
+			</div>
+			<div class="mt-5 flex items-center justify-between gap-2">
+				<button
+					type="button"
+					class="rounded-md px-3 py-1.5 text-sm font-medium text-gray-700 transition hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-800"
+					on:click={ignoreMotd}
+				>
+					{$i18n.t('Close for now')}
+				</button>
+				<button
+					type="button"
+					class="rounded-md bg-gray-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-black dark:bg-white dark:text-black dark:hover:bg-gray-100"
+					on:click={closeMotd}
+				>
+					{$i18n.t('Close')}
+				</button>
+			</div>
+		</div>
+	</div>
 {/if}
 
 {#if $config?.features.enable_community_sharing}

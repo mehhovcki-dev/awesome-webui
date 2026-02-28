@@ -369,6 +369,9 @@
 				await syncModelsStore();
 				toast.success(successMessage);
 			}
+
+			// Clear selection after batch actions complete to avoid accidental repeat actions.
+			clearSelection();
 		} catch (error) {
 			toast.error(error?.detail ?? `${error}`);
 		} finally {

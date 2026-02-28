@@ -398,6 +398,12 @@ from open_webui.config import (
     USER_PERMISSIONS,
     DEFAULT_USER_ROLE,
     DEFAULT_GROUP_ID,
+    ENABLE_SYSTEM_NOTICE,
+    SYSTEM_NOTICE_TITLE,
+    SYSTEM_NOTICE_CONTENT,
+    ENABLE_MOTD,
+    MOTD_TITLE,
+    MOTD_CONTENT,
     PENDING_USER_OVERLAY_CONTENT,
     PENDING_USER_OVERLAY_TITLE,
     DEFAULT_PROMPT_SUGGESTIONS,
@@ -915,6 +921,14 @@ app.state.config.DEFAULT_MODEL_PARAMS = DEFAULT_MODEL_PARAMS
 app.state.config.DEFAULT_PROMPT_SUGGESTIONS = DEFAULT_PROMPT_SUGGESTIONS
 app.state.config.DEFAULT_USER_ROLE = DEFAULT_USER_ROLE
 app.state.config.DEFAULT_GROUP_ID = DEFAULT_GROUP_ID
+
+app.state.config.ENABLE_SYSTEM_NOTICE = ENABLE_SYSTEM_NOTICE
+app.state.config.SYSTEM_NOTICE_TITLE = SYSTEM_NOTICE_TITLE
+app.state.config.SYSTEM_NOTICE_CONTENT = SYSTEM_NOTICE_CONTENT
+
+app.state.config.ENABLE_MOTD = ENABLE_MOTD
+app.state.config.MOTD_TITLE = MOTD_TITLE
+app.state.config.MOTD_CONTENT = MOTD_CONTENT
 
 app.state.config.PENDING_USER_OVERLAY_CONTENT = PENDING_USER_OVERLAY_CONTENT
 app.state.config.PENDING_USER_OVERLAY_TITLE = PENDING_USER_OVERLAY_TITLE
@@ -2368,6 +2382,16 @@ async def get_app_config(request: Request):
                     "sharepoint_tenant_id": ONEDRIVE_SHAREPOINT_TENANT_ID.value,
                 },
                 "ui": {
+                    "system_notice": {
+                        "enabled": app.state.config.ENABLE_SYSTEM_NOTICE,
+                        "title": app.state.config.SYSTEM_NOTICE_TITLE,
+                        "content": app.state.config.SYSTEM_NOTICE_CONTENT,
+                    },
+                    "motd": {
+                        "enabled": app.state.config.ENABLE_MOTD,
+                        "title": app.state.config.MOTD_TITLE,
+                        "content": app.state.config.MOTD_CONTENT,
+                    },
                     "pending_user_overlay_title": app.state.config.PENDING_USER_OVERLAY_TITLE,
                     "pending_user_overlay_content": app.state.config.PENDING_USER_OVERLAY_CONTENT,
                     "response_watermark": app.state.config.RESPONSE_WATERMARK,
@@ -2383,16 +2407,20 @@ async def get_app_config(request: Request):
             }
             if user is not None and (user.role in ["admin", "user"])
             else {
-                **(
-                    {
-                        "ui": {
-                            "pending_user_overlay_title": app.state.config.PENDING_USER_OVERLAY_TITLE,
-                            "pending_user_overlay_content": app.state.config.PENDING_USER_OVERLAY_CONTENT,
-                        }
-                    }
-                    if user and user.role == "pending"
-                    else {}
-                ),
+                "ui": {
+                    "system_notice": {
+                        "enabled": app.state.config.ENABLE_SYSTEM_NOTICE,
+                        "title": app.state.config.SYSTEM_NOTICE_TITLE,
+                        "content": app.state.config.SYSTEM_NOTICE_CONTENT,
+                    },
+                    "motd": {
+                        "enabled": app.state.config.ENABLE_MOTD,
+                        "title": app.state.config.MOTD_TITLE,
+                        "content": app.state.config.MOTD_CONTENT,
+                    },
+                    "pending_user_overlay_title": app.state.config.PENDING_USER_OVERLAY_TITLE,
+                    "pending_user_overlay_content": app.state.config.PENDING_USER_OVERLAY_CONTENT,
+                },
                 **(
                     {
                         "metadata": {

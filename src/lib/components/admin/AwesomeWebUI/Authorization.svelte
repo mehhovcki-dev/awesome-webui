@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getContext, onMount } from 'svelte';
+	import { getContext, onDestroy, onMount } from 'svelte';
 	import { get } from 'svelte/store';
 	import { toast } from 'svelte-sonner';
 
@@ -73,6 +73,10 @@
 	let inviteTtlDateTime = '';
 	let creatorCooldownPreset = '1h';
 	let creatorCooldownDateTime = '';
+	let autoSaveTimer: ReturnType<typeof setTimeout> | null = null;
+	let autoSaveInFlight = false;
+	let autoSaveQueued = false;
+	let autoSaveReady = false;
 
 	const creatorScopeOptions = [
 		{
@@ -371,26 +375,37 @@
 		}
 	};
 
-	const saveHandler = async () => {
+	type SaveOptions = {
+		silent?: boolean;
+		useRawDurations?: boolean;
+	};
+
+	const saveHandler = async (options: SaveOptions = {}) => {
 		if (!adminConfig) {
 			return;
 		}
 
-		const inviteTtlSeconds = resolveDurationSeconds(
-			inviteTtlPreset,
-			inviteTtlDateTime,
-			inviteTtlPresets,
-			t('invite expiry')
-		);
-		if (inviteTtlSeconds === null) {
-			return;
+		const { silent = false, useRawDurations = false } = options;
+
+		let inviteTtlSeconds = Math.max(0, Number(adminConfig.INVITE_CODE_TTL_SECONDS) || 0);
+		if (!useRawDurations) {
+			const resolvedInviteTtlSeconds = resolveDurationSeconds(
+				inviteTtlPreset,
+				inviteTtlDateTime,
+				inviteTtlPresets,
+				t('invite expiry')
+			);
+			if (resolvedInviteTtlSeconds === null) {
+				return;
+			}
+			inviteTtlSeconds = resolvedInviteTtlSeconds;
 		}
 
 		let creatorCooldownSeconds = Math.max(
 			0,
 			Number(adminConfig.INVITE_CREATOR_COOLDOWN_SECONDS) || 0
 		);
-		if (adminConfig.INVITE_CREATOR_SCOPE === 'all') {
+		if (!useRawDurations && adminConfig.INVITE_CREATOR_SCOPE === 'all') {
 			const resolvedCreatorCooldownSeconds = resolveDurationSeconds(
 				creatorCooldownPreset,
 				creatorCooldownDateTime,
@@ -428,8 +443,41 @@
 		if (response) {
 			adminConfig = normalizeAdminConfig(response);
 			syncDurationControlsFromConfig();
-			toast.success(t('Authorization settings updated'));
+			if (!silent) {
+				toast.success(t('Authorization settings updated'));
+			}
 		}
+	};
+
+	const runAutoSave = async () => {
+		if (autoSaveInFlight) {
+			autoSaveQueued = true;
+			return;
+		}
+
+		autoSaveInFlight = true;
+		await saveHandler({ silent: true, useRawDurations: true });
+		autoSaveInFlight = false;
+
+		if (autoSaveQueued) {
+			autoSaveQueued = false;
+			await runAutoSave();
+		}
+	};
+
+	const queueToggleAutoSave = () => {
+		if (!autoSaveReady || !adminConfig) {
+			return;
+		}
+
+		if (autoSaveTimer) {
+			clearTimeout(autoSaveTimer);
+		}
+
+		autoSaveTimer = setTimeout(() => {
+			autoSaveTimer = null;
+			void runAutoSave();
+		}, 300);
 	};
 
 	const generateInviteHandler = async () => {
@@ -479,6 +527,15 @@
 			})(),
 			refreshInviteCodes()
 		]);
+
+		autoSaveReady = true;
+	});
+
+	onDestroy(() => {
+		if (autoSaveTimer) {
+			clearTimeout(autoSaveTimer);
+			autoSaveTimer = null;
+		}
 	});
 </script>
 
@@ -509,7 +566,7 @@
 									{$i18n.t('Allow new accounts to register on this instance.')}
 								</div>
 							</div>
-							<Switch bind:state={adminConfig.ENABLE_SIGNUP} />
+							<Switch bind:state={adminConfig.ENABLE_SIGNUP} on:change={queueToggleAutoSave} />
 						</div>
 
 						<div
@@ -523,7 +580,10 @@
 									{$i18n.t('Allow users to create accounts via email and password.')}
 								</div>
 							</div>
-							<Switch bind:state={adminConfig.ENABLE_PASSWORD_SIGNUP} />
+							<Switch
+								bind:state={adminConfig.ENABLE_PASSWORD_SIGNUP}
+								on:change={queueToggleAutoSave}
+							/>
 						</div>
 
 						<div
@@ -535,7 +595,10 @@
 									{$i18n.t('Allow users to sign in with configured OAuth/SSO providers.')}
 								</div>
 							</div>
-							<Switch bind:state={adminConfig.ENABLE_OAUTH_LOGIN} />
+							<Switch
+								bind:state={adminConfig.ENABLE_OAUTH_LOGIN}
+								on:change={queueToggleAutoSave}
+							/>
 						</div>
 
 						<div
@@ -547,7 +610,10 @@
 									{$i18n.t('Allow new accounts to be created from SSO providers.')}
 								</div>
 							</div>
-							<Switch bind:state={adminConfig.ENABLE_OAUTH_SIGNUP} />
+							<Switch
+								bind:state={adminConfig.ENABLE_OAUTH_SIGNUP}
+								on:change={queueToggleAutoSave}
+							/>
 						</div>
 					</div>
 
@@ -651,7 +717,10 @@
 								{$i18n.t('Require invite codes for new account creation.')}
 							</div>
 						</div>
-						<Switch bind:state={adminConfig.ENABLE_INVITE_ONLY_AUTH} />
+						<Switch
+							bind:state={adminConfig.ENABLE_INVITE_ONLY_AUTH}
+							on:change={queueToggleAutoSave}
+						/>
 					</div>
 
 					{#if adminConfig.ENABLE_INVITE_ONLY_AUTH}
@@ -799,7 +868,10 @@
 											{$i18n.t('If disabled, each code can only be used once.')}
 										</div>
 									</div>
-									<Switch bind:state={adminConfig.INVITE_CODE_REUSABLE} />
+									<Switch
+										bind:state={adminConfig.INVITE_CODE_REUSABLE}
+										on:change={queueToggleAutoSave}
+									/>
 								</div>
 
 								{#if adminConfig.INVITE_CODE_REUSABLE}

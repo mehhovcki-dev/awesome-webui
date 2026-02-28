@@ -241,6 +241,12 @@ def _serialize_admin_config(request: Request) -> dict:
         "ENABLE_NOTES": request.app.state.config.ENABLE_NOTES,
         "ENABLE_USER_WEBHOOKS": request.app.state.config.ENABLE_USER_WEBHOOKS,
         "ENABLE_USER_STATUS": request.app.state.config.ENABLE_USER_STATUS,
+        "ENABLE_SYSTEM_NOTICE": request.app.state.config.ENABLE_SYSTEM_NOTICE,
+        "SYSTEM_NOTICE_TITLE": request.app.state.config.SYSTEM_NOTICE_TITLE,
+        "SYSTEM_NOTICE_CONTENT": request.app.state.config.SYSTEM_NOTICE_CONTENT,
+        "ENABLE_MOTD": request.app.state.config.ENABLE_MOTD,
+        "MOTD_TITLE": request.app.state.config.MOTD_TITLE,
+        "MOTD_CONTENT": request.app.state.config.MOTD_CONTENT,
         "PENDING_USER_OVERLAY_TITLE": request.app.state.config.PENDING_USER_OVERLAY_TITLE,
         "PENDING_USER_OVERLAY_CONTENT": request.app.state.config.PENDING_USER_OVERLAY_CONTENT,
         "RESPONSE_WATERMARK": request.app.state.config.RESPONSE_WATERMARK,
@@ -1311,6 +1317,12 @@ class AdminConfig(BaseModel):
     ENABLE_NOTES: bool
     ENABLE_USER_WEBHOOKS: bool
     ENABLE_USER_STATUS: bool
+    ENABLE_SYSTEM_NOTICE: bool = False
+    SYSTEM_NOTICE_TITLE: Optional[str] = "System Notice"
+    SYSTEM_NOTICE_CONTENT: Optional[str] = ""
+    ENABLE_MOTD: bool = False
+    MOTD_TITLE: Optional[str] = "Message of the day!"
+    MOTD_CONTENT: Optional[str] = ""
     PENDING_USER_OVERLAY_TITLE: Optional[str] = None
     PENDING_USER_OVERLAY_CONTENT: Optional[str] = None
     RESPONSE_WATERMARK: Optional[str] = None
@@ -1573,6 +1585,20 @@ async def update_admin_config(
 
     request.app.state.config.ENABLE_USER_WEBHOOKS = form_data.ENABLE_USER_WEBHOOKS
     request.app.state.config.ENABLE_USER_STATUS = form_data.ENABLE_USER_STATUS
+
+    request.app.state.config.ENABLE_SYSTEM_NOTICE = form_data.ENABLE_SYSTEM_NOTICE
+    request.app.state.config.SYSTEM_NOTICE_TITLE = _sanitize_text(
+        form_data.SYSTEM_NOTICE_TITLE, 160
+    )
+    request.app.state.config.SYSTEM_NOTICE_CONTENT = _sanitize_text(
+        form_data.SYSTEM_NOTICE_CONTENT, 10000
+    )
+
+    request.app.state.config.ENABLE_MOTD = form_data.ENABLE_MOTD
+    request.app.state.config.MOTD_TITLE = _sanitize_text(form_data.MOTD_TITLE, 160)
+    request.app.state.config.MOTD_CONTENT = _sanitize_text(
+        form_data.MOTD_CONTENT, 10000
+    )
 
     request.app.state.config.PENDING_USER_OVERLAY_TITLE = (
         form_data.PENDING_USER_OVERLAY_TITLE

@@ -1633,6 +1633,42 @@ PENDING_USER_OVERLAY_CONTENT = PersistentConfig(
     os.environ.get("PENDING_USER_OVERLAY_CONTENT", ""),
 )
 
+ENABLE_SYSTEM_NOTICE = PersistentConfig(
+    "ENABLE_SYSTEM_NOTICE",
+    "ui.system_notice.enabled",
+    os.environ.get("ENABLE_SYSTEM_NOTICE", "False").lower() == "true",
+)
+
+SYSTEM_NOTICE_TITLE = PersistentConfig(
+    "SYSTEM_NOTICE_TITLE",
+    "ui.system_notice.title",
+    os.environ.get("SYSTEM_NOTICE_TITLE", "System Notice"),
+)
+
+SYSTEM_NOTICE_CONTENT = PersistentConfig(
+    "SYSTEM_NOTICE_CONTENT",
+    "ui.system_notice.content",
+    os.environ.get("SYSTEM_NOTICE_CONTENT", ""),
+)
+
+ENABLE_MOTD = PersistentConfig(
+    "ENABLE_MOTD",
+    "ui.motd.enabled",
+    os.environ.get("ENABLE_MOTD", "False").lower() == "true",
+)
+
+MOTD_TITLE = PersistentConfig(
+    "MOTD_TITLE",
+    "ui.motd.title",
+    os.environ.get("MOTD_TITLE", "Message of the day!"),
+)
+
+MOTD_CONTENT = PersistentConfig(
+    "MOTD_CONTENT",
+    "ui.motd.content",
+    os.environ.get("MOTD_CONTENT", ""),
+)
+
 
 RESPONSE_WATERMARK = PersistentConfig(
     "RESPONSE_WATERMARK",

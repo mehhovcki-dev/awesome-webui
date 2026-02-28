@@ -286,6 +286,16 @@ type Config = {
 		allowed_signup_providers?: string[];
 	};
 	ui?: {
+		system_notice?: {
+			enabled?: boolean;
+			title?: string;
+			content?: string;
+		};
+		motd?: {
+			enabled?: boolean;
+			title?: string;
+			content?: string;
+		};
 		pending_user_overlay_title?: string;
 		pending_user_overlay_content?: string;
 	};
