@@ -404,6 +404,8 @@ from open_webui.config import (
     ENABLE_MOTD,
     MOTD_TITLE,
     MOTD_CONTENT,
+    NOTIFICATION_SOUND_LIBRARY,
+    CUSTOM_EMOJI_LIBRARY,
     PENDING_USER_OVERLAY_CONTENT,
     PENDING_USER_OVERLAY_TITLE,
     DEFAULT_PROMPT_SUGGESTIONS,
@@ -929,6 +931,8 @@ app.state.config.SYSTEM_NOTICE_CONTENT = SYSTEM_NOTICE_CONTENT
 app.state.config.ENABLE_MOTD = ENABLE_MOTD
 app.state.config.MOTD_TITLE = MOTD_TITLE
 app.state.config.MOTD_CONTENT = MOTD_CONTENT
+app.state.config.NOTIFICATION_SOUND_LIBRARY = NOTIFICATION_SOUND_LIBRARY
+app.state.config.CUSTOM_EMOJI_LIBRARY = CUSTOM_EMOJI_LIBRARY
 
 app.state.config.PENDING_USER_OVERLAY_CONTENT = PENDING_USER_OVERLAY_CONTENT
 app.state.config.PENDING_USER_OVERLAY_TITLE = PENDING_USER_OVERLAY_TITLE
@@ -2392,6 +2396,8 @@ async def get_app_config(request: Request):
                         "title": app.state.config.MOTD_TITLE,
                         "content": app.state.config.MOTD_CONTENT,
                     },
+                    "notification_sounds": app.state.config.NOTIFICATION_SOUND_LIBRARY,
+                    "custom_emojis": app.state.config.CUSTOM_EMOJI_LIBRARY,
                     "pending_user_overlay_title": app.state.config.PENDING_USER_OVERLAY_TITLE,
                     "pending_user_overlay_content": app.state.config.PENDING_USER_OVERLAY_CONTENT,
                     "response_watermark": app.state.config.RESPONSE_WATERMARK,
@@ -2418,6 +2424,8 @@ async def get_app_config(request: Request):
                         "title": app.state.config.MOTD_TITLE,
                         "content": app.state.config.MOTD_CONTENT,
                     },
+                    "notification_sounds": app.state.config.NOTIFICATION_SOUND_LIBRARY,
+                    "custom_emojis": app.state.config.CUSTOM_EMOJI_LIBRARY,
                     "pending_user_overlay_title": app.state.config.PENDING_USER_OVERLAY_TITLE,
                     "pending_user_overlay_content": app.state.config.PENDING_USER_OVERLAY_CONTENT,
                 },

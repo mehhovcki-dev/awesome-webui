@@ -120,6 +120,96 @@ def _sanitize_oauth_provider_list(provider_list):
     return sanitized
 
 
+def _sanitize_notification_sound_library(raw_sounds) -> list[dict]:
+    if not isinstance(raw_sounds, list):
+        return []
+
+    sanitized: list[dict] = []
+    for item in raw_sounds[:100]:
+        if not isinstance(item, dict):
+            continue
+
+        sound_id = _sanitize_text(item.get("id"), 128)
+        if not sound_id:
+            continue
+
+        sound_name = _sanitize_text(item.get("name"), 128) or "Notification sound"
+        sound_type = _sanitize_text(item.get("type"), 32).lower()
+        if sound_type not in {"channel", "chat_completion"}:
+            continue
+
+        data_url = _sanitize_text(item.get("data_url"), 6_000_000)
+        # Accept only inline audio payloads to avoid remote URL abuse.
+        if not data_url.startswith("data:audio/"):
+            continue
+
+        sanitized.append(
+            {
+                "id": sound_id,
+                "name": sound_name,
+                "type": sound_type,
+                "data_url": data_url,
+            }
+        )
+
+    return sanitized
+
+
+def _sanitize_custom_emoji_library(raw_emojis) -> list[dict]:
+    if not isinstance(raw_emojis, list):
+        return []
+
+    sanitized: list[dict] = []
+    seen_names: set[str] = set()
+
+    for item in raw_emojis[:500]:
+        if not isinstance(item, dict):
+            continue
+
+        emoji_id = _sanitize_text(item.get("id"), 128)
+        if not emoji_id:
+            continue
+
+        emoji_name = re.sub(
+            r"[^a-z0-9_]",
+            "",
+            _sanitize_text(item.get("name"), 64).lower(),
+        )[:32]
+        if len(emoji_name) < 2 or emoji_name in seen_names:
+            continue
+
+        data_url = _sanitize_text(item.get("data_url"), 6_000_000)
+        if not re.match(
+            r"^data:image\/(?:png|jpe?g|webp|gif|avif|svg\+xml);base64,",
+            data_url,
+            flags=re.IGNORECASE,
+        ):
+            continue
+
+        created_by = _sanitize_text(item.get("created_by"), 128)
+        created_by_name = _sanitize_text(item.get("created_by_name"), 128)
+
+        created_at_raw = item.get("created_at")
+        if isinstance(created_at_raw, (int, float)):
+            created_at = int(created_at_raw)
+        else:
+            created_at = int(time.time())
+
+        sanitized.append(
+            {
+                "id": emoji_id,
+                "name": emoji_name,
+                "data_url": data_url,
+                "created_by": created_by or None,
+                "created_by_name": created_by_name or None,
+                "created_at": created_at,
+            }
+        )
+        seen_names.add(emoji_name)
+
+    return sanitized
+
+
 def _sanitize_text(value, max_length: int | None = None) -> str:
     text = str(value or "").strip()
     if max_length is not None:
@@ -247,6 +337,8 @@ def _serialize_admin_config(request: Request) -> dict:
         "ENABLE_MOTD": request.app.state.config.ENABLE_MOTD,
         "MOTD_TITLE": request.app.state.config.MOTD_TITLE,
         "MOTD_CONTENT": request.app.state.config.MOTD_CONTENT,
+        "NOTIFICATION_SOUND_LIBRARY": request.app.state.config.NOTIFICATION_SOUND_LIBRARY,
+        "CUSTOM_EMOJI_LIBRARY": request.app.state.config.CUSTOM_EMOJI_LIBRARY,
         "PENDING_USER_OVERLAY_TITLE": request.app.state.config.PENDING_USER_OVERLAY_TITLE,
         "PENDING_USER_OVERLAY_CONTENT": request.app.state.config.PENDING_USER_OVERLAY_CONTENT,
         "RESPONSE_WATERMARK": request.app.state.config.RESPONSE_WATERMARK,
@@ -305,6 +397,10 @@ def create_session_response(
         "name": user.name,
         "role": user.role,
         "profile_image_url": f"/api/v1/users/{user.id}/profile/image",
+        "presence_state": user.presence_state,
+        "status_emoji": user.status_emoji,
+        "status_message": user.status_message,
+        "status_expires_at": user.status_expires_at,
         "permissions": user_permissions,
     }
 
@@ -317,6 +413,10 @@ def create_session_response(
 class SessionUserResponse(Token, UserProfileImageResponse):
     expires_at: Optional[int] = None
     permissions: Optional[dict] = None
+    presence_state: Optional[str] = None
+    status_emoji: Optional[str] = None
+    status_message: Optional[str] = None
+    status_expires_at: Optional[int] = None
 
 
 class SessionUserInfoResponse(SessionUserResponse, UserStatus):
@@ -381,6 +481,7 @@ async def get_session_user(
         "gender": user.gender,
         "date_of_birth": user.date_of_birth,
         "oauth": user.oauth,
+        "presence_state": user.presence_state,
         "status_emoji": user.status_emoji,
         "status_message": user.status_message,
         "status_expires_at": user.status_expires_at,
@@ -1323,6 +1424,8 @@ class AdminConfig(BaseModel):
     ENABLE_MOTD: bool = False
     MOTD_TITLE: Optional[str] = "Message of the day!"
     MOTD_CONTENT: Optional[str] = ""
+    NOTIFICATION_SOUND_LIBRARY: List[dict] = Field(default_factory=list)
+    CUSTOM_EMOJI_LIBRARY: List[dict] = Field(default_factory=list)
     PENDING_USER_OVERLAY_TITLE: Optional[str] = None
     PENDING_USER_OVERLAY_CONTENT: Optional[str] = None
     RESPONSE_WATERMARK: Optional[str] = None
@@ -1598,6 +1701,12 @@ async def update_admin_config(
     request.app.state.config.MOTD_TITLE = _sanitize_text(form_data.MOTD_TITLE, 160)
     request.app.state.config.MOTD_CONTENT = _sanitize_text(
         form_data.MOTD_CONTENT, 10000
+    )
+    request.app.state.config.NOTIFICATION_SOUND_LIBRARY = (
+        _sanitize_notification_sound_library(form_data.NOTIFICATION_SOUND_LIBRARY)
+    )
+    request.app.state.config.CUSTOM_EMOJI_LIBRARY = _sanitize_custom_emoji_library(
+        form_data.CUSTOM_EMOJI_LIBRARY
     )
 
     request.app.state.config.PENDING_USER_OVERLAY_TITLE = (

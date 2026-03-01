@@ -178,6 +178,7 @@ async def get_channels(
 
     channels = Channels.get_channels_by_user_id(user.id, db=db)
     channel_list = []
+    viewer_role = user.role
     for channel in channels:
         last_message = Messages.get_last_message_by_channel_id(channel.id, db=db)
         last_message_at = last_message.created_at if last_message else None
@@ -200,15 +201,18 @@ async def get_channels(
                 member.user_id
                 for member in Channels.get_members_by_channel_id(channel.id, db=db)
             ]
-            users = [
-                UserIdNameStatusResponse(
-                    **{
-                        **user.model_dump(),
-                        "is_active": Users.is_active(user),
-                    }
+            users = []
+            for member_user in Users.get_users_by_user_ids(user_ids, db=db):
+                users.append(
+                    UserIdNameStatusResponse(
+                        **{
+                            **member_user.model_dump(),
+                            "is_active": Users.is_active_for_viewer(
+                                member_user, viewer_role=viewer_role
+                            ),
+                        }
+                    )
                 )
-                for user in Users.get_users_by_user_ids(user_ids, db=db)
-            ]
 
         channel_list.append(
             ChannelListItemResponse(
@@ -420,15 +424,18 @@ async def get_channel_by_id(
             for member in Channels.get_members_by_channel_id(channel.id, db=db)
         ]
 
-        users = [
-            UserIdNameStatusResponse(
-                **{
-                    **user.model_dump(),
-                    "is_active": Users.is_active(user),
-                }
+        users = []
+        for member_user in Users.get_users_by_user_ids(user_ids, db=db):
+            users.append(
+                UserIdNameStatusResponse(
+                    **{
+                        **member_user.model_dump(),
+                        "is_active": Users.is_active_for_viewer(
+                            member_user, viewer_role=user.role
+                        ),
+                    }
+                )
             )
-            for user in Users.get_users_by_user_ids(user_ids, db=db)
-        ]
 
         channel_member = Channels.get_member_by_channel_and_user_id(
             channel.id, user.id, db=db
@@ -540,8 +547,13 @@ async def get_channel_members_by_id(
 
         return {
             "users": [
-                UserModelResponse(**user.model_dump(), is_active=Users.is_active(user))
-                for user in users
+                UserModelResponse(
+                    **member_user.model_dump(),
+                    is_active=Users.is_active_for_viewer(
+                        member_user, viewer_role=user.role
+                    ),
+                )
+                for member_user in users
             ],
             "total": total,
         }
@@ -573,8 +585,13 @@ async def get_channel_members_by_id(
 
         return {
             "users": [
-                UserModelResponse(**user.model_dump(), is_active=Users.is_active(user))
-                for user in users
+                UserModelResponse(
+                    **member_user.model_dump(),
+                    is_active=Users.is_active_for_viewer(
+                        member_user, viewer_role=user.role
+                    ),
+                )
+                for member_user in users
             ],
             "total": total,
         }

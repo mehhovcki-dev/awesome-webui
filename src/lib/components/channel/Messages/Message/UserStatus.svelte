@@ -14,7 +14,18 @@
 	import Emoji from '$lib/components/common/Emoji.svelte';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 
-	export let user = null;
+export let user = null;
+let presence: 'online' | 'idle' | 'dnd' | 'offline' = 'offline';
+
+$: presence = getPresenceState(user);
+
+	const getPresenceState = (member: any): 'online' | 'idle' | 'dnd' | 'offline' => {
+		const normalized = String(member?.presence_state ?? '').toLowerCase();
+		if (['online', 'idle', 'dnd', 'offline'].includes(normalized)) {
+			return normalized as 'online' | 'idle' | 'dnd' | 'offline';
+		}
+		return member?.is_active ? 'online' : 'offline';
+	};
 
 	const directMessageHandler = async () => {
 		if (!user) {
@@ -49,26 +60,29 @@
 				</div>
 
 				<div class=" flex items-center gap-2">
-					{#if user?.is_active}
-						<div>
-							<span class="relative flex size-2">
-								<span
-									class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"
-								/>
-								<span class="relative inline-flex rounded-full size-2 bg-green-500" />
-							</span>
-						</div>
-
-						<span class="text-xs"> {$i18n.t('Active')} </span>
+					{#if presence === 'dnd'}
+						<span class="inline-flex size-2.5 rounded-full bg-red-500 items-center justify-center">
+							<span class="h-[1px] w-1.5 rounded-full bg-white"></span>
+						</span>
+					{:else if presence === 'offline'}
+						<span class="inline-flex size-2.5 rounded-full border-2 border-gray-500"></span>
+					{:else if presence === 'idle'}
+						<span class="inline-flex size-2.5 rounded-full bg-yellow-500"></span>
 					{:else}
-						<div>
-							<span class="relative flex size-2">
-								<span class="relative inline-flex rounded-full size-2 bg-gray-500" />
-							</span>
-						</div>
-
-						<span class="text-xs"> {$i18n.t('Away')} </span>
+						<span class="inline-flex size-2.5 rounded-full bg-green-500"></span>
 					{/if}
+
+					<span class="text-xs">
+						{$i18n.t(
+							presence === 'dnd'
+								? 'Do Not Disturb'
+								: presence === 'offline'
+									? 'Invisible'
+									: presence === 'idle'
+										? 'Idle'
+										: 'Online'
+						)}
+					</span>
 				</div>
 			</div>
 		</div>

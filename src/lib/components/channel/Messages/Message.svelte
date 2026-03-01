@@ -115,6 +115,7 @@
 				>
 					{#if onReaction}
 						<EmojiPicker
+							showGifTab={false}
 							onClose={() => (showButtons = false)}
 							onSubmit={(name) => {
 								showButtons = false;
@@ -494,6 +495,7 @@
 
 								{#if onReaction}
 									<EmojiPicker
+										showGifTab={false}
 										onSubmit={(name) => {
 											onReaction(name);
 										}}

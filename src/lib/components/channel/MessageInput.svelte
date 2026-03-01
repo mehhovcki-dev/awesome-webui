@@ -32,13 +32,16 @@
 	import InputMenu from './MessageInput/InputMenu.svelte';
 	import Tooltip from '../common/Tooltip.svelte';
 	import RichTextInput from '../common/RichTextInput.svelte';
+	import EmojiPicker from '../common/EmojiPicker.svelte';
 	import VoiceRecording from '../chat/MessageInput/VoiceRecording.svelte';
 	import FileItem from '../common/FileItem.svelte';
 	import Image from '../common/Image.svelte';
 	import FilesOverlay from '../chat/MessageInput/FilesOverlay.svelte';
 	import InputVariablesModal from '../chat/MessageInput/InputVariablesModal.svelte';
 	import MentionList from './MessageInput/MentionList.svelte';
+	import EmojiSuggestionList from './MessageInput/EmojiSuggestionList.svelte';
 	import Skeleton from '../chat/Messages/Skeleton.svelte';
+	import FaceSmile from '../icons/FaceSmile.svelte';
 	import XMark from '../icons/XMark.svelte';
 
 	export let placeholder = $i18n.t('Type here...');
@@ -591,6 +594,13 @@
 					]
 				: []),
 			{
+				char: ':',
+				render: getSuggestionRenderer(EmojiSuggestionList, {
+					i18n,
+					insertTextHandler: insertTextAtCursor
+				})
+			},
+			{
 				char: '/',
 				render: getSuggestionRenderer(CommandSuggestionList, {
 					i18n,
@@ -979,6 +989,26 @@
 											</InputMenu>
 										{/if}
 									</slot>
+
+									<EmojiPicker
+										onSubmit={async (name) => {
+											if (chatInputElement?.insertEmojiByShortCode) {
+												chatInputElement.insertEmojiByShortCode(name);
+											} else {
+												await insertTextAtCursor(`:${name}:`);
+											}
+										}}
+									>
+										<Tooltip content={$i18n.t('Insert emoji')}>
+											<button
+												class="bg-transparent hover:bg-white/80 text-gray-800 dark:text-white dark:hover:bg-gray-800 transition rounded-full p-1.5 outline-hidden focus:outline-hidden"
+												type="button"
+												aria-label={$i18n.t('Insert emoji')}
+											>
+												<FaceSmile />
+											</button>
+										</Tooltip>
+									</EmojiPicker>
 								</div>
 
 								<div class="self-end flex space-x-1 mr-1">

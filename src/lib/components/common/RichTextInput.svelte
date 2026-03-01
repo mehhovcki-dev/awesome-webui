@@ -93,13 +93,66 @@
 		}
 	});
 
+	const normalizeEmojiShortCode = (value: unknown) =>
+		String(value ?? '')
+			.trim()
+			.replace(/^:+|:+$/g, '')
+			.toLowerCase();
+
+	const getCustomEmojiDataUrl = (shortCode: string) => {
+		if (!shortCode) {
+			return null;
+		}
+
+		const configData = get(config);
+		const customEmojis = Array.isArray(configData?.ui?.custom_emojis)
+			? configData.ui.custom_emojis
+			: [];
+
+		const match = customEmojis.find(
+			(item) =>
+				normalizeEmojiShortCode(item?.name ?? '') === shortCode &&
+				String(item?.data_url ?? '').startsWith('data:image/')
+		);
+
+		return match ? String(match.data_url) : null;
+	};
+
+	const getStandardEmojiCodepoint = (shortCode: string) => {
+		const map = get(shortCodesToEmojis) ?? {};
+		return String(map[shortCode] ?? '').trim();
+	};
+
+	const getEmojiImageSrc = (rawShortCode: unknown) => {
+		const shortCode = normalizeEmojiShortCode(rawShortCode);
+		if (!shortCode) {
+			return null;
+		}
+
+		const customEmojiDataUrl = getCustomEmojiDataUrl(shortCode);
+		if (customEmojiDataUrl) {
+			return customEmojiDataUrl;
+		}
+
+		const codepoint = getStandardEmojiCodepoint(shortCode);
+		if (!codepoint) {
+			return null;
+		}
+
+		return `${WEBUI_BASE_URL}/assets/emojis/${codepoint.toLowerCase()}.svg`;
+	};
+
 	// Convert TipTap mention spans -> <@id>
 	turndownService.addRule('mentions', {
 		filter: (node) => node.nodeName === 'SPAN' && node.getAttribute('data-type') === 'mention',
 		replacement: (_content, node: HTMLElement) => {
-			const id = node.getAttribute('data-id') || '';
+			const id = String(node.getAttribute('data-id') || '').trim();
 			// TipTap stores the trigger char in data-mention-suggestion-char (usually "@")
 			const ch = node.getAttribute('data-mention-suggestion-char') || '@';
+			if (ch === ':') {
+				const shortCode = normalizeEmojiShortCode(id);
+				return shortCode ? `:${shortCode}:` : '';
+			}
 			// Emit <@id> style, e.g. <@llama3.2:latest>
 			return `<${ch}${id}>`;
 		}
@@ -107,6 +160,7 @@
 
 	import { onMount, onDestroy, tick, getContext } from 'svelte';
 	import { createEventDispatcher } from 'svelte';
+	import { get } from 'svelte/store';
 
 	const i18n = getContext('i18n');
 	const eventDispatch = createEventDispatcher();
@@ -114,7 +168,7 @@
 	import { Fragment, DOMParser } from 'prosemirror-model';
 	import { EditorState, Plugin, PluginKey, TextSelection, Selection } from 'prosemirror-state';
 	import { Decoration, DecorationSet } from 'prosemirror-view';
-	import { Editor, Extension, mergeAttributes } from '@tiptap/core';
+	import { Editor, Extension, mergeAttributes, nodeInputRule } from '@tiptap/core';
 
 	import { AIAutocompletion } from './RichTextInput/AutoCompletion.js';
 
@@ -140,7 +194,8 @@
 	import Mention from '@tiptap/extension-mention';
 	import FormattingButtons from './RichTextInput/FormattingButtons.svelte';
 
-	import { PASTED_TEXT_CHARACTER_LIMIT } from '$lib/constants';
+	import { PASTED_TEXT_CHARACTER_LIMIT, WEBUI_BASE_URL } from '$lib/constants';
+	import { config, shortCodesToEmojis } from '$lib/stores';
 	import { createLowlight } from 'lowlight';
 	import hljs from 'highlight.js';
 
@@ -467,6 +522,48 @@
 		focus();
 	};
 
+	export const insertEmojiByShortCode = (rawShortCode: unknown, appendSpace = true) => {
+		if (!editor || !editor.view) return;
+
+		const shortCode = normalizeEmojiShortCode(rawShortCode);
+		if (!shortCode) {
+			return;
+		}
+
+		const mentionNode = editor.schema.nodes.mention;
+		if (mentionNode) {
+			editor
+				.chain()
+				.focus()
+				.insertContent([
+					{
+						type: 'mention',
+						attrs: {
+							id: shortCode,
+							label: shortCode,
+							mentionSuggestionChar: ':'
+						}
+					},
+					...(appendSpace
+						? [
+								{
+									type: 'text',
+									text: ' '
+								}
+							]
+						: [])
+				])
+				.run();
+			return;
+		}
+
+		editor
+			.chain()
+			.focus()
+			.insertContent(`:${shortCode}:${appendSpace ? ' ' : ''}`)
+			.run();
+	};
+
 	export const replaceVariables = (variables) => {
 		if (!editor || !editor.view) return;
 		const { state, view } = editor;
@@ -643,6 +740,35 @@
 		}
 	});
 
+	const EmojiMentionInputRule = Extension.create({
+		name: 'emojiMentionInputRule',
+		addInputRules() {
+			const mentionNodeType = this.editor?.schema?.nodes?.mention;
+			if (!mentionNodeType) {
+				return [];
+			}
+
+			return [
+				nodeInputRule({
+					find: /:([a-zA-Z0-9_+\-]+):$/,
+					type: mentionNodeType,
+					getAttributes: (match) => {
+						const shortCode = normalizeEmojiShortCode(match?.[1] ?? '');
+						if (!shortCode || !getEmojiImageSrc(shortCode)) {
+							return false;
+						}
+
+						return {
+							id: shortCode,
+							label: shortCode,
+							mentionSuggestionChar: ':'
+						};
+					}
+				})
+			];
+		}
+	});
+
 	onMount(async () => {
 		content = value;
 
@@ -722,8 +848,63 @@
 					? [
 							Mention.configure({
 								HTMLAttributes: { class: 'mention' },
-								suggestions: suggestions
-							})
+								suggestions: suggestions,
+								renderText: ({ node, suggestion }) => {
+									const mentionChar = String(
+										node?.attrs?.mentionSuggestionChar ?? suggestion?.char ?? '@'
+									);
+									const mentionLabel = String(node?.attrs?.label ?? node?.attrs?.id ?? '').trim();
+
+									if (mentionChar === ':') {
+										const shortCode = normalizeEmojiShortCode(
+											node?.attrs?.id ?? node?.attrs?.label ?? ''
+										);
+										return shortCode ? `:${shortCode}:` : '';
+									}
+
+									return `${mentionChar}${mentionLabel}`;
+								},
+								renderHTML: ({ options, node, suggestion }) => {
+									const mentionChar = String(
+										node?.attrs?.mentionSuggestionChar ?? suggestion?.char ?? '@'
+									);
+									const mentionLabel = String(node?.attrs?.label ?? node?.attrs?.id ?? '').trim();
+
+									if (mentionChar !== ':') {
+										return ['span', mergeAttributes(options.HTMLAttributes), `${mentionChar}${mentionLabel}`];
+									}
+
+									const shortCode = normalizeEmojiShortCode(
+										node?.attrs?.id ?? node?.attrs?.label ?? ''
+									);
+									const emojiImageSrc = getEmojiImageSrc(shortCode);
+
+									const mentionAttributes = mergeAttributes(options.HTMLAttributes, {
+										class: 'mention inline-flex items-center emoji-mention',
+										'data-emoji-shortcode': shortCode
+									});
+
+									if (!shortCode || !emojiImageSrc) {
+										return ['span', mentionAttributes, shortCode ? `:${shortCode}:` : ''];
+									}
+
+									return [
+										'span',
+										mentionAttributes,
+										[
+											'img',
+											{
+												src: emojiImageSrc,
+												alt: `:${shortCode}:`,
+												class: 'inline-block size-[1.05em] align-[-0.125em]',
+												loading: 'lazy',
+												draggable: 'false'
+											}
+										]
+									];
+								}
+							}),
+							EmojiMentionInputRule
 						]
 					: []),
 

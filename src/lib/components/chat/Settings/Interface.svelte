@@ -40,6 +40,8 @@
 
 	let notificationSound = true;
 	let notificationSoundAlways = false;
+	let globalChannelSoundId = '';
+	let chatCompletionSoundId = '';
 
 	let highContrastMode = false;
 
@@ -103,6 +105,40 @@
 	let showManageImageCompressionModal = false;
 
 	let textScale = null;
+
+	const getNotificationSoundsByType = (type: 'channel' | 'chat_completion') => {
+		if (!Array.isArray($config?.ui?.notification_sounds)) {
+			return [];
+		}
+
+		return $config.ui.notification_sounds.filter(
+			(sound) => sound?.type === type && typeof sound?.id === 'string'
+		);
+	};
+
+	const saveNotificationSoundPreferences = () => {
+		const notifications = { ...($settings?.notifications ?? {}) };
+		const sounds = { ...(notifications?.sounds ?? {}) };
+
+		if (globalChannelSoundId) {
+			sounds.global_channel_sound_id = globalChannelSoundId;
+		} else {
+			delete sounds.global_channel_sound_id;
+		}
+
+		if (chatCompletionSoundId) {
+			sounds.chat_completion_sound_id = chatCompletionSoundId;
+		} else {
+			delete sounds.chat_completion_sound_id;
+		}
+
+		saveSettings({
+			notifications: {
+				...notifications,
+				sounds
+			}
+		});
+	};
 
 	const toggleLandingPageMode = async () => {
 		landingPageMode = landingPageMode === '' ? 'chat' : '';
@@ -248,6 +284,10 @@
 
 		notificationSound = $settings?.notificationSound ?? true;
 		notificationSoundAlways = $settings?.notificationSoundAlways ?? false;
+		globalChannelSoundId = String($settings?.notifications?.sounds?.global_channel_sound_id ?? '');
+		chatCompletionSoundId = String(
+			$settings?.notifications?.sounds?.chat_completion_sound_id ?? ''
+		);
 
 		iframeSandboxAllowSameOrigin = $settings?.iframeSandboxAllowSameOrigin ?? false;
 		iframeSandboxAllowForms = $settings?.iframeSandboxAllowForms ?? false;
@@ -487,6 +527,38 @@
 								}}
 							/>
 						</div>
+					</div>
+				</div>
+
+				<div class="py-0.5">
+					<div class="flex w-full justify-between items-start gap-4">
+						<div class="self-center text-xs">{$i18n.t('Default channel sound')}</div>
+						<select
+							class="bg-transparent border border-gray-200/70 dark:border-gray-800 rounded-md px-2 py-1 text-xs max-w-56 text-right"
+							bind:value={globalChannelSoundId}
+							on:change={saveNotificationSoundPreferences}
+						>
+							<option value="">{$i18n.t('System default')}</option>
+							{#each getNotificationSoundsByType('channel') as sound (sound.id)}
+								<option value={sound.id}>{sound.name}</option>
+							{/each}
+						</select>
+					</div>
+				</div>
+
+				<div class="py-0.5">
+					<div class="flex w-full justify-between items-start gap-4">
+						<div class="self-center text-xs">{$i18n.t('Chat completion sound')}</div>
+						<select
+							class="bg-transparent border border-gray-200/70 dark:border-gray-800 rounded-md px-2 py-1 text-xs max-w-56 text-right"
+							bind:value={chatCompletionSoundId}
+							on:change={saveNotificationSoundPreferences}
+						>
+							<option value="">{$i18n.t('System default')}</option>
+							{#each getNotificationSoundsByType('chat_completion') as sound (sound.id)}
+								<option value={sound.id}>{sound.name}</option>
+							{/each}
+						</select>
 					</div>
 				</div>
 			{/if}

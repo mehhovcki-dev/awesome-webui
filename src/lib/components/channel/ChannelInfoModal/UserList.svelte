@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { WEBUI_API_BASE_URL, WEBUI_BASE_URL } from '$lib/constants';
-	import { WEBUI_NAME, config, user as _user, showSidebar } from '$lib/stores';
+	import { WEBUI_NAME, config, user as _user, showSidebar, socket } from '$lib/stores';
 	import { goto } from '$app/navigation';
-	import { onMount, getContext } from 'svelte';
+	import { onMount, onDestroy, getContext } from 'svelte';
 
 	import dayjs from 'dayjs';
 	import relativeTime from 'dayjs/plugin/relativeTime';
@@ -79,6 +79,41 @@
 		}
 	};
 
+	const getPresenceState = (member: any): 'online' | 'idle' | 'dnd' | 'offline' => {
+		const normalized = String(member?.presence_state ?? '').toLowerCase();
+		if (['online', 'idle', 'dnd', 'offline'].includes(normalized)) {
+			return normalized as 'online' | 'idle' | 'dnd' | 'offline';
+		}
+		return member?.is_active ? 'online' : 'offline';
+	};
+
+	const presenceEventHandler = (event) => {
+		if (event?.data?.type !== 'user:presence' || !Array.isArray(users)) {
+			return;
+		}
+
+		const patch = event?.data?.data ?? null;
+		if (!patch?.id) {
+			return;
+		}
+
+		users = users.map((member) => {
+			if (member?.id !== patch.id) {
+				return member;
+			}
+
+			return {
+				...member,
+				presence_state: patch?.presence_state ?? member?.presence_state ?? 'online',
+				status_emoji: patch?.status_emoji ?? member?.status_emoji ?? null,
+				status_message: patch?.status_message ?? member?.status_message ?? null,
+				status_expires_at: patch?.status_expires_at ?? member?.status_expires_at ?? null,
+				is_active:
+					typeof patch?.is_active === 'boolean' ? patch.is_active : (member?.is_active ?? false)
+			};
+		});
+	};
+
 	// Debounce only query changes
 	$: if (query !== undefined && channel !== null) {
 		clearTimeout(debounceTimer);
@@ -91,6 +126,18 @@
 	$: if (channel !== null && page && orderBy && direction) {
 		getUserList();
 	}
+
+	onMount(() => {
+		$socket?.off('events', presenceEventHandler);
+		$socket?.on('events', presenceEventHandler);
+	});
+
+	onDestroy(() => {
+		if (debounceTimer) {
+			clearTimeout(debounceTimer);
+		}
+		$socket?.off('events', presenceEventHandler);
+	});
 </script>
 
 <div class="flex flex-col justify-center">
@@ -223,18 +270,21 @@
 										<Tooltip content={user.email} placement="top-start">
 											<div class="font-medium truncate">{user.name}</div>
 										</Tooltip>
-
-										{#if user?.is_active}
-											<div>
-												<span class="relative flex size-1.5">
-													<span
-														class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"
-													></span>
-													<span class="relative inline-flex size-1.5 rounded-full bg-green-500"
-													></span>
+										<div>
+											{#if getPresenceState(user) === 'dnd'}
+												<span
+													class="inline-flex size-2 rounded-full bg-red-500 items-center justify-center"
+												>
+													<span class="h-[1px] w-1 rounded-full bg-white"></span>
 												</span>
-											</div>
-										{/if}
+											{:else if getPresenceState(user) === 'offline'}
+												<span class="inline-flex size-2 rounded-full border border-gray-500"></span>
+											{:else if getPresenceState(user) === 'idle'}
+												<span class="inline-flex size-2 rounded-full bg-yellow-500"></span>
+											{:else}
+												<span class="inline-flex size-2 rounded-full bg-green-500"></span>
+											{/if}
+										</div>
 									</div>
 								</div>
 

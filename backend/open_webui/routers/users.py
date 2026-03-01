@@ -364,7 +364,7 @@ async def get_user_status_by_session_user(
 async def update_user_status_by_session_user(
     request: Request,
     form_data: UserStatus,
-    user=Depends(get_verified_user),
+    session_user=Depends(get_verified_user),
     db: Session = Depends(get_session),
 ):
     if not request.app.state.config.ENABLE_USER_STATUS:
@@ -372,10 +372,73 @@ async def update_user_status_by_session_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=ERROR_MESSAGES.ACTION_PROHIBITED,
         )
-    user = Users.get_user_by_id(user.id, db=db)
-    if user:
-        user = Users.update_user_status_by_id(user.id, form_data, db=db)
-        return user
+    target_user = Users.get_user_by_id(session_user.id, db=db)
+    if target_user:
+        target_user = Users.update_user_status_by_id(target_user.id, form_data, db=db)
+
+        if target_user:
+            # Broadcast presence changes so all connected clients can update immediately.
+            try:
+                from open_webui.socket.main import SESSION_POOL, emit_to_users
+
+                # Keep session cache in sync for all active sessions of this user.
+                for sid in list(SESSION_POOL.keys()):
+                    entry = SESSION_POOL.get(sid)
+                    if entry and entry.get("id") == target_user.id:
+                        SESSION_POOL[sid] = {
+                            **entry,
+                            "presence_state": target_user.presence_state,
+                            "status_emoji": target_user.status_emoji,
+                            "status_message": target_user.status_message,
+                            "status_expires_at": target_user.status_expires_at,
+                        }
+
+                # Build a viewer-role map from active sessions so admin/user visibility can differ.
+                viewer_roles: dict[str, str] = {}
+                for entry in SESSION_POOL.values():
+                    if not entry:
+                        continue
+
+                    viewer_id = entry.get("id")
+                    viewer_role = entry.get("role", "user")
+                    if viewer_id and viewer_id not in viewer_roles:
+                        viewer_roles[viewer_id] = viewer_role
+
+                for viewer_id, viewer_role in viewer_roles.items():
+                    await emit_to_users(
+                        "events",
+                        {
+                            "chat_id": None,
+                            "message_id": None,
+                            "data": {
+                                "type": "user:presence",
+                                "data": {
+                                    "id": target_user.id,
+                                    "presence_state": target_user.presence_state,
+                                    "status_emoji": target_user.status_emoji,
+                                    "status_message": target_user.status_message,
+                                    "status_expires_at": target_user.status_expires_at,
+                                    "is_active": Users.is_active_for_viewer(
+                                        target_user, viewer_role=viewer_role
+                                    ),
+                                },
+                            },
+                            "user": {
+                                "id": target_user.id,
+                                "name": target_user.name,
+                            },
+                        },
+                        [viewer_id],
+                    )
+            except Exception as e:
+                log.debug(f"Failed to emit realtime presence update: {e}")
+
+            return target_user
+
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ERROR_MESSAGES.DEFAULT(),
+        )
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -449,7 +512,7 @@ class UserActiveResponse(UserStatus):
 
 @router.get("/{user_id}", response_model=UserActiveResponse)
 async def get_user_by_id(
-    user_id: str, user=Depends(get_admin_user), db: Session = Depends(get_session)
+    user_id: str, session_user=Depends(get_admin_user), db: Session = Depends(get_session)
 ):
     # Check if user_id is a shared chat
     # If it is, get the user_id from the chat
@@ -464,14 +527,16 @@ async def get_user_by_id(
                 detail=ERROR_MESSAGES.USER_NOT_FOUND,
             )
 
-    user = Users.get_user_by_id(user_id, db=db)
-    if user:
+    target_user = Users.get_user_by_id(user_id, db=db)
+    if target_user:
         groups = Groups.get_groups_by_member_id(user_id, db=db)
         return UserActiveResponse(
             **{
-                **user.model_dump(),
+                **target_user.model_dump(),
                 "groups": [{"id": group.id, "name": group.name} for group in groups],
-                "is_active": Users.is_user_active(user_id, db=db),
+                "is_active": Users.is_active_for_viewer(
+                    target_user, viewer_role=session_user.role
+                ),
             }
         )
     else:
@@ -483,16 +548,20 @@ async def get_user_by_id(
 
 @router.get("/{user_id}/info", response_model=UserInfoResponse)
 async def get_user_info_by_id(
-    user_id: str, user=Depends(get_verified_user), db: Session = Depends(get_session)
+    user_id: str,
+    session_user=Depends(get_verified_user),
+    db: Session = Depends(get_session),
 ):
-    user = Users.get_user_by_id(user_id, db=db)
-    if user:
+    target_user = Users.get_user_by_id(user_id, db=db)
+    if target_user:
         groups = Groups.get_groups_by_member_id(user_id, db=db)
         return UserInfoResponse(
             **{
-                **user.model_dump(),
+                **target_user.model_dump(),
                 "groups": [{"id": group.id, "name": group.name} for group in groups],
-                "is_active": Users.is_user_active(user_id, db=db),
+                "is_active": Users.is_active_for_viewer(
+                    target_user, viewer_role=session_user.role
+                ),
             }
         )
     else:
@@ -561,10 +630,17 @@ def get_user_profile_image_by_id(user_id: str, user=Depends(get_verified_user)):
 
 @router.get("/{user_id}/active", response_model=dict)
 async def get_user_active_status_by_id(
-    user_id: str, user=Depends(get_verified_user), db: Session = Depends(get_session)
+    user_id: str,
+    session_user=Depends(get_verified_user),
+    db: Session = Depends(get_session),
 ):
+    target_user = Users.get_user_by_id(user_id, db=db)
     return {
-        "active": Users.is_user_active(user_id, db=db),
+        "active": Users.is_active_for_viewer(
+            target_user, viewer_role=session_user.role
+        )
+        if target_user
+        else False,
     }
 
 

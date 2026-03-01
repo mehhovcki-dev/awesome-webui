@@ -1669,6 +1669,18 @@ MOTD_CONTENT = PersistentConfig(
     os.environ.get("MOTD_CONTENT", ""),
 )
 
+NOTIFICATION_SOUND_LIBRARY = PersistentConfig(
+    "NOTIFICATION_SOUND_LIBRARY",
+    "ui.notification_sounds",
+    [],
+)
+
+CUSTOM_EMOJI_LIBRARY = PersistentConfig(
+    "CUSTOM_EMOJI_LIBRARY",
+    "ui.custom_emojis",
+    [],
+)
+
 
 RESPONSE_WATERMARK = PersistentConfig(
     "RESPONSE_WATERMARK",

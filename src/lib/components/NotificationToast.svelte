@@ -12,6 +12,7 @@
 	export let onClick: Function = () => {};
 	export let title: string = 'HI';
 	export let content: string;
+	export let soundUrl: string = '/audio/notification.mp3';
 
 	let startX = 0,
 		startY = 0;
@@ -72,7 +73,7 @@
 			if (!$playingNotificationSound && $isLastActiveTab) {
 				playingNotificationSound.set(true);
 
-				const audio = new Audio(`/audio/notification.mp3`);
+				const audio = new Audio(soundUrl || '/audio/notification.mp3');
 				audio.play().finally(() => {
 					// Ensure the global state is reset after the sound finishes
 					playingNotificationSound.set(false);

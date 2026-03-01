@@ -152,6 +152,164 @@
 
 	$: evaluateMotdVisibility($config?.ui?.motd ?? null, $user?.role ?? null);
 
+	const normalizePresenceState = (value) => {
+		const normalized = String(value ?? 'online').toLowerCase();
+		return ['online', 'idle', 'dnd', 'offline'].includes(normalized) ? normalized : 'online';
+	};
+
+	const shouldNotifyForChatCompletion = () => {
+		const presence = normalizePresenceState($user?.presence_state);
+		if (presence === 'offline') {
+			return false;
+		}
+		return true;
+	};
+
+	const shouldNotifyForChannels = () => {
+		const presence = normalizePresenceState($user?.presence_state);
+		if (presence === 'offline' || presence === 'dnd') {
+			return false;
+		}
+		return true;
+	};
+
+	const getChannelNotificationMode = (channelId) => {
+		const mode = $settings?.notifications?.channel_modes?.[channelId];
+		if (['all', 'mentions', 'none'].includes(mode)) {
+			return mode;
+		}
+		return 'all';
+	};
+
+	const extractMentionedUserIds = (content) => {
+		if (!content || typeof content !== 'string') {
+			return [];
+		}
+
+		const mentionRegex = /<@U:([^|>]+)(?:\|[^>]+)?>/g;
+		const mentionedIds = [];
+		let match = mentionRegex.exec(content);
+		while (match !== null) {
+			mentionedIds.push(String(match[1]));
+			match = mentionRegex.exec(content);
+		}
+		return mentionedIds;
+	};
+
+	const shouldNotifyForChannelMessage = (channelId, content) => {
+		if (!shouldNotifyForChannels()) {
+			return false;
+		}
+
+		const mode = getChannelNotificationMode(channelId);
+		if (mode === 'none') {
+			return false;
+		}
+
+		if (mode === 'mentions') {
+			if (!$user?.id) {
+				return false;
+			}
+			return extractMentionedUserIds(content).includes($user.id);
+		}
+
+		return true;
+	};
+
+	const getNotificationSoundLibrary = () => {
+		if (!Array.isArray($config?.ui?.notification_sounds)) {
+			return [];
+		}
+		return $config.ui.notification_sounds.filter((item) => {
+			return (
+				item &&
+				typeof item.id === 'string' &&
+				typeof item.type === 'string' &&
+				typeof item.data_url === 'string'
+			);
+		});
+	};
+
+	const findNotificationSound = (soundId, soundType) => {
+		if (!soundId) {
+			return null;
+		}
+		return (
+			getNotificationSoundLibrary().find(
+				(sound) => sound.id === soundId && sound.type === soundType
+			) ?? null
+		);
+	};
+
+	const getNotificationSoundUrl = (kind, channelId = null) => {
+		const soundSettings = $settings?.notifications?.sounds ?? {};
+
+		if (kind === 'chat_completion') {
+			const sound = findNotificationSound(soundSettings?.chat_completion_sound_id, 'chat_completion');
+			return sound?.data_url || '/audio/notification.mp3';
+		}
+
+		const perChannelSoundId =
+			channelId && soundSettings?.channels ? soundSettings.channels[channelId] : null;
+		const perChannelSound = findNotificationSound(perChannelSoundId, 'channel');
+		if (perChannelSound?.data_url) {
+			return perChannelSound.data_url;
+		}
+
+		const globalChannelSound = findNotificationSound(soundSettings?.global_channel_sound_id, 'channel');
+		return globalChannelSound?.data_url || '/audio/notification.mp3';
+	};
+
+	const applyPresencePatch = (targetUser, patch) => {
+		if (!targetUser || targetUser.id !== patch?.id) {
+			return targetUser;
+		}
+
+		return {
+			...targetUser,
+			presence_state: patch?.presence_state ?? targetUser?.presence_state ?? 'online',
+			status_emoji: patch?.status_emoji ?? targetUser?.status_emoji ?? null,
+			status_message: patch?.status_message ?? targetUser?.status_message ?? null,
+			status_expires_at: patch?.status_expires_at ?? targetUser?.status_expires_at ?? null,
+			is_active:
+				typeof patch?.is_active === 'boolean' ? patch.is_active : (targetUser?.is_active ?? false)
+		};
+	};
+
+	const applyRealtimePresenceUpdate = (patch) => {
+		if (!patch?.id) {
+			return;
+		}
+
+		if ($user?.id === patch.id) {
+			user.set(applyPresencePatch($user, patch));
+		}
+
+		channels.update((currentChannels) => {
+			if (!Array.isArray(currentChannels)) {
+				return currentChannels;
+			}
+
+			return currentChannels.map((channel) => {
+				if (!Array.isArray(channel?.users)) {
+					return channel;
+				}
+
+				let changed = false;
+				const nextUsers = channel.users.map((channelUser) => {
+					if (channelUser?.id !== patch.id) {
+						return channelUser;
+					}
+
+					changed = true;
+					return applyPresencePatch(channelUser, patch);
+				});
+
+				return changed ? { ...channel, users: nextUsers } : channel;
+			});
+		});
+	};
+
 	const setupSocket = async (enableWebsocket) => {
 		const _socket = io(`${WEBUI_BASE_URL}` || undefined, {
 			reconnection: true,
@@ -405,16 +563,27 @@
 		const type = event?.data?.type ?? null;
 		const data = event?.data?.data ?? null;
 
+		if (type === 'user:presence') {
+			applyRealtimePresenceUpdate(data);
+			return;
+		}
+
 		if ((event.chat_id !== $chatId && !$temporaryChatEnabled) || isFocused) {
 			if (type === 'chat:completion') {
 				const { done, content, title } = data;
 				const displayTitle = title || $i18n.t('New Chat');
 
 				if (done) {
+					if (!shouldNotifyForChatCompletion()) {
+						return;
+					}
+
+					const completionSoundUrl = getNotificationSoundUrl('chat_completion');
+
 					if ($settings?.notificationSoundAlways ?? false) {
 						playingNotificationSound.set(true);
 
-						const audio = new Audio(`/audio/notification.mp3`);
+						const audio = new Audio(completionSoundUrl);
 						audio.play().finally(() => {
 							// Ensure the global state is reset after the sound finishes
 							playingNotificationSound.set(false);
@@ -436,7 +605,8 @@
 								goto(`/c/${event.chat_id}`);
 							},
 							content: content,
-							title: displayTitle
+							title: displayTitle,
+							soundUrl: completionSoundUrl
 						},
 						duration: 15000,
 						unstyled: true
@@ -622,6 +792,11 @@
 			}
 
 			if (type === 'message') {
+				if (!shouldNotifyForChannelMessage(event.channel_id, data?.content ?? '')) {
+					return;
+				}
+
+				const channelSoundUrl = getNotificationSoundUrl('channel', event.channel_id);
 				const title = `${data?.user?.name}${event?.channel?.type !== 'dm' ? ` (#${event?.channel?.name})` : ''}`;
 
 				if ($isLastActiveTab) {
@@ -639,7 +814,8 @@
 							goto(`/channels/${event.channel_id}`);
 						},
 						content: data?.content,
-						title: `${title}`
+						title: `${title}`,
+						soundUrl: channelSoundUrl
 					},
 					duration: 15000,
 					unstyled: true

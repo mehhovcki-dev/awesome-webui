@@ -85,14 +85,14 @@ Priority guide: `HIGH` (soon), `MEDIUM`, `LOW`, `XLOW` (later).
 - [x] `HIGH` Invite-code system
 - [x] `HIGH` Ability to change registration from the website (OAuth providers, etc.)
 - [x] `MEDIUM` System notice and MOTD
-- [ ] `LOW` Custom emojis
-- [ ] `LOW` Notification sounds for channels
+- [x] `LOW` Custom emojis
+- [x] `LOW` Notification sounds for channels
 - [x] `LOW` Discord OAuth
 
 ### User Interface
 - [ ] `LOW` Add GIFs to channels
-- [ ] `LOW` Notification changes for channels
-- [ ] `LOW` Integrate GIF search with emojis and custom emojis
+- [x] `LOW` Notification changes for channels
+- [x] `LOW` Integrate GIF search with emojis and custom emojis
 
 ### General
 - [ ] `?` Add migration support for files (such as DB) from default Open WebUI

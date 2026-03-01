@@ -27,6 +27,7 @@
 	import UserStatusModal from './UserStatusModal.svelte';
 	import Emoji from '$lib/components/common/Emoji.svelte';
 	import XMark from '$lib/components/icons/XMark.svelte';
+	import ChevronRight from '$lib/components/icons/ChevronRight.svelte';
 	import { updateUserStatus } from '$lib/apis/users';
 	import { toast } from 'svelte-sonner';
 
@@ -66,6 +67,66 @@
 		if (state && ($config?.features?.enable_public_active_users_count || role === 'admin')) {
 			getUsageInfo();
 		}
+	};
+
+	type PresenceOption = {
+		id: 'online' | 'idle' | 'dnd' | 'offline';
+		label: string;
+		description?: string;
+		colorClass: string;
+	};
+
+	const presenceOptions: PresenceOption[] = [
+		{
+			id: 'online',
+			label: 'Online',
+			description: 'All notifications',
+			colorClass: 'bg-green-500'
+		},
+		{
+			id: 'idle',
+			label: 'Idle',
+			description: 'Only channel and chat completion notifications',
+			colorClass: 'bg-yellow-500'
+		},
+		{
+			id: 'dnd',
+			label: 'Do Not Disturb',
+			description: 'You will not receive channel notifications',
+			colorClass: 'bg-red-500'
+		},
+		{
+			id: 'offline',
+			label: 'Invisible',
+			description: 'You will appear offline',
+			colorClass: 'bg-gray-500'
+		}
+	];
+
+	const getPresenceState = () => {
+		const value = String($user?.presence_state ?? 'online').toLowerCase();
+		return presenceOptions.some((option) => option.id === value) ? value : 'online';
+	};
+
+	const getPresenceOption = () => {
+		const state = getPresenceState();
+		return presenceOptions.find((option) => option.id === state) ?? presenceOptions[0];
+	};
+
+	const updatePresenceState = async (presenceState: PresenceOption['id']) => {
+		const res = await updateUserStatus(localStorage.token, {
+			presence_state: presenceState
+		}).catch((error) => {
+			toast.error(`${error}`);
+			return null;
+		});
+
+		if (!res) {
+			toast.error($i18n.t('Failed to update status'));
+			return;
+		}
+
+		user.set(await getSessionUser(localStorage.token));
 	};
 </script>
 
@@ -107,25 +168,92 @@
 						</div>
 
 						<div class=" flex items-center gap-2">
-							{#if $user?.is_active ?? true}
-								<div>
-									<span class="relative flex size-2">
-										<span class="relative inline-flex rounded-full size-2 bg-green-500" />
-									</span>
-								</div>
-
-								<span class="text-xs"> {$i18n.t('Active')} </span>
+							{#if getPresenceState() === 'dnd'}
+								<span
+									class="inline-flex size-2.5 rounded-full bg-red-500 items-center justify-center"
+								>
+									<span class="h-[1.5px] w-1.5 rounded-full bg-white"></span>
+								</span>
+							{:else if getPresenceState() === 'offline'}
+								<span class="inline-flex size-2.5 rounded-full border-2 border-gray-500"></span>
 							{:else}
-								<div>
-									<span class="relative flex size-2">
-										<span class="relative inline-flex rounded-full size-2 bg-gray-500" />
-									</span>
-								</div>
-
-								<span class="text-xs"> {$i18n.t('Away')} </span>
+								<span
+									class="relative inline-flex rounded-full size-2.5 {getPresenceOption().colorClass}"
+								/>
 							{/if}
+
+							<span class="text-xs"> {$i18n.t(getPresenceOption().label)} </span>
 						</div>
 					</div>
+				</div>
+
+				<div class="mx-1 mb-1">
+					<DropdownMenu.Sub>
+						<DropdownMenu.SubTrigger
+							class="mb-1 w-full px-2.5 py-1.5 rounded-xl bg-gray-50 dark:text-white dark:bg-gray-900/50 text-black transition text-xs flex items-center gap-2"
+						>
+							{#if getPresenceState() === 'dnd'}
+								<span
+									class="inline-flex size-3 rounded-full bg-red-500 items-center justify-center shrink-0"
+								>
+									<span class="h-[1.5px] w-1.5 rounded-full bg-white"></span>
+								</span>
+							{:else if getPresenceState() === 'offline'}
+								<span
+									class="inline-flex size-3 rounded-full border-2 border-gray-500 shrink-0"
+								></span>
+							{:else}
+								<span
+									class="inline-flex size-3 rounded-full {getPresenceOption().colorClass} shrink-0"
+								></span>
+							{/if}
+
+							<div class="self-center flex-1 text-left">{getPresenceOption().label}</div>
+							<ChevronRight className="size-3.5 opacity-60 shrink-0" strokeWidth="2" />
+						</DropdownMenu.SubTrigger>
+
+						<DropdownMenu.SubContent
+							class="select-none w-72 rounded-2xl p-1 z-50 bg-white dark:bg-gray-850 dark:text-white border border-gray-100 dark:border-gray-800 shadow-lg"
+							transition={flyAndScale}
+							sideOffset={8}
+						>
+							{#each presenceOptions as option}
+								<DropdownMenu.Item
+									class="w-full rounded-xl px-2.5 py-2 text-left cursor-pointer select-none hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+									on:click={() => {
+										updatePresenceState(option.id);
+									}}
+								>
+									<div class="flex items-start gap-2.5">
+										<div class="pt-0.5 shrink-0">
+											{#if option.id === 'dnd'}
+												<span
+													class="inline-flex size-3 rounded-full bg-red-500 items-center justify-center"
+												>
+													<span class="h-[1.5px] w-1.5 rounded-full bg-white"></span>
+												</span>
+											{:else if option.id === 'offline'}
+												<span class="inline-flex size-3 rounded-full border-2 border-gray-500"></span>
+											{:else}
+												<span class="inline-flex size-3 rounded-full {option.colorClass}"></span>
+											{/if}
+										</div>
+
+										<div class="flex-1 min-w-0">
+											<div class="text-sm leading-tight text-gray-900 dark:text-gray-100">
+												{option.label}
+											</div>
+											{#if option.description}
+												<div class="mt-0.5 text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+													{option.description}
+												</div>
+											{/if}
+										</div>
+									</div>
+								</DropdownMenu.Item>
+							{/each}
+						</DropdownMenu.SubContent>
+					</DropdownMenu.Sub>
 				</div>
 
 				{#if $user?.status_emoji || $user?.status_message}

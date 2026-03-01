@@ -296,6 +296,20 @@ type Config = {
 			title?: string;
 			content?: string;
 		};
+		notification_sounds?: {
+			id?: string;
+			name?: string;
+			type?: 'channel' | 'chat_completion';
+			data_url?: string;
+		}[];
+		custom_emojis?: {
+			id?: string;
+			name?: string;
+			data_url?: string;
+			created_by?: string | null;
+			created_by_name?: string | null;
+			created_at?: number;
+		}[];
 		pending_user_overlay_title?: string;
 		pending_user_overlay_content?: string;
 	};
@@ -313,5 +327,10 @@ export type SessionUser = {
 	name: string;
 	role: string;
 	profile_image_url: string;
+	presence_state?: 'online' | 'idle' | 'dnd' | 'offline' | string | null;
+	status_emoji?: string | null;
+	status_message?: string | null;
+	status_expires_at?: number | null;
+	is_active?: boolean;
 	oauth?: Record<string, { sub?: string }>;
 };

@@ -44,6 +44,14 @@
 		}
 		return hasPublicReadGrant(channel?.access_grants);
 	};
+
+	const getPresenceState = (member: any): 'online' | 'idle' | 'dnd' | 'offline' => {
+		const normalized = String(member?.presence_state ?? '').toLowerCase();
+		if (['online', 'idle', 'dnd', 'offline'].includes(normalized)) {
+			return normalized as 'online' | 'idle' | 'dnd' | 'offline';
+		}
+		return member?.is_active ? 'online' : 'offline';
+	};
 </script>
 
 <ChannelModal
@@ -122,19 +130,27 @@
 							{/each}
 
 							{#if channelMembers.length === 1}
+								{@const dmPresence = getPresenceState(channelMembers[0])}
 								<div class="absolute bottom-0 right-0">
-									<span class="relative flex size-2">
-										{#if channelMembers[0]?.is_active}
-											<span
-												class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"
-											></span>
-										{/if}
+									{#if dmPresence === 'dnd'}
 										<span
-											class="relative inline-flex size-2 rounded-full {channelMembers[0]?.is_active
-												? 'bg-green-500'
-												: 'bg-gray-300 dark:bg-gray-700'} border-[1.5px] border-white dark:border-gray-900"
+											class="inline-flex size-2.5 rounded-full bg-red-500 items-center justify-center border-[1.5px] border-white dark:border-gray-900"
+										>
+											<span class="h-[1px] w-1.5 rounded-full bg-white"></span>
+										</span>
+									{:else if dmPresence === 'offline'}
+										<span
+											class="inline-flex size-2.5 rounded-full border-[1.5px] border-gray-400 dark:border-gray-600 bg-white dark:bg-gray-900"
 										></span>
-									</span>
+									{:else if dmPresence === 'idle'}
+										<span
+											class="inline-flex size-2.5 rounded-full bg-yellow-500 border-[1.5px] border-white dark:border-gray-900"
+										></span>
+									{:else}
+										<span
+											class="inline-flex size-2.5 rounded-full bg-green-500 border-[1.5px] border-white dark:border-gray-900"
+										></span>
+									{/if}
 								</div>
 							{/if}
 						</div>

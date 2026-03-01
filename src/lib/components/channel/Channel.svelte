@@ -183,6 +183,46 @@
 		}
 	};
 
+	const presenceEventHandler = (event) => {
+		if (event?.data?.type !== 'user:presence') {
+			return;
+		}
+
+		if (!channel?.users || !Array.isArray(channel.users)) {
+			return;
+		}
+
+		const patch = event?.data?.data ?? null;
+		if (!patch?.id) {
+			return;
+		}
+
+		let changed = false;
+		const nextUsers = channel.users.map((channelUser) => {
+			if (channelUser?.id !== patch.id) {
+				return channelUser;
+			}
+
+			changed = true;
+			return {
+				...channelUser,
+				presence_state: patch?.presence_state ?? channelUser?.presence_state ?? 'online',
+				status_emoji: patch?.status_emoji ?? channelUser?.status_emoji ?? null,
+				status_message: patch?.status_message ?? channelUser?.status_message ?? null,
+				status_expires_at: patch?.status_expires_at ?? channelUser?.status_expires_at ?? null,
+				is_active:
+					typeof patch?.is_active === 'boolean' ? patch.is_active : (channelUser?.is_active ?? false)
+			};
+		});
+
+		if (changed) {
+			channel = {
+				...channel,
+				users: nextUsers
+			};
+		}
+	};
+
 	const submitHandler = async ({ content, data }) => {
 		if (!content && (data?.files ?? []).length === 0) {
 			return;
@@ -247,6 +287,7 @@
 		}
 
 		$socket?.on('events:channel', channelEventHandler);
+		$socket?.on('events', presenceEventHandler);
 
 		mediaQuery = window.matchMedia('(min-width: 1024px)');
 
@@ -267,6 +308,7 @@
 		updateLastReadAt(id);
 		_channelId.set(null);
 		$socket?.off('events:channel', channelEventHandler);
+		$socket?.off('events', presenceEventHandler);
 	});
 </script>
 

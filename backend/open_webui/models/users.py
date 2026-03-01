@@ -188,9 +188,22 @@ class UserGroupIdsListResponse(BaseModel):
 
 
 class UserStatus(BaseModel):
+    presence_state: Optional[str] = None
     status_emoji: Optional[str] = None
     status_message: Optional[str] = None
     status_expires_at: Optional[int] = None
+
+    @field_validator("presence_state")
+    @classmethod
+    def validate_presence_state(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+
+        normalized = str(value).strip().lower()
+        if normalized in {"online", "idle", "dnd", "offline"}:
+            return normalized
+
+        raise ValueError("Invalid presence_state")
 
 
 class UserInfoResponse(UserStatus):
@@ -258,6 +271,22 @@ class UserUpdateForm(BaseModel):
 
 
 class UsersTable:
+    @staticmethod
+    def normalize_presence_state(value: Optional[str]) -> str:
+        normalized = str(value or "online").strip().lower()
+        if normalized in {"online", "idle", "dnd", "offline"}:
+            return normalized
+        return "online"
+
+    @classmethod
+    def is_active_for_viewer(
+        cls, user: UserModel, viewer_role: Optional[str] = None
+    ) -> bool:
+        # Explicit offline presence hides activity for non-admin viewers.
+        if cls.normalize_presence_state(user.presence_state) == "offline":
+            return viewer_role == "admin" and cls.is_active(user)
+        return cls.is_active(user)
+
     def insert_new_user(
         self,
         id: str,
