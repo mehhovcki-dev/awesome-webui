@@ -768,6 +768,120 @@ DISCORD_USERINFO_ENDPOINT = PersistentConfig(
     os.environ.get("DISCORD_USERINFO_ENDPOINT", "https://discord.com/api/users/@me"),
 )
 
+GITLAB_OAUTH_ENABLED = PersistentConfig(
+    "GITLAB_OAUTH_ENABLED",
+    "oauth.gitlab.enabled",
+    os.environ.get("GITLAB_OAUTH_ENABLED", "True").lower() == "true",
+)
+
+GITLAB_CLIENT_ID = PersistentConfig(
+    "GITLAB_CLIENT_ID",
+    "oauth.gitlab.client_id",
+    os.environ.get("GITLAB_CLIENT_ID", ""),
+)
+
+GITLAB_CLIENT_SECRET = PersistentConfig(
+    "GITLAB_CLIENT_SECRET",
+    "oauth.gitlab.client_secret",
+    os.environ.get("GITLAB_CLIENT_SECRET", ""),
+)
+
+GITLAB_OAUTH_SCOPE = PersistentConfig(
+    "GITLAB_OAUTH_SCOPE",
+    "oauth.gitlab.scope",
+    os.environ.get("GITLAB_OAUTH_SCOPE", "openid profile email"),
+)
+
+GITLAB_REDIRECT_URI = PersistentConfig(
+    "GITLAB_REDIRECT_URI",
+    "oauth.gitlab.redirect_uri",
+    os.environ.get("GITLAB_REDIRECT_URI", ""),
+)
+
+GITLAB_ACCESS_TOKEN_URL = PersistentConfig(
+    "GITLAB_ACCESS_TOKEN_URL",
+    "oauth.gitlab.access_token_url",
+    os.environ.get("GITLAB_ACCESS_TOKEN_URL", "https://gitlab.com/oauth/token"),
+)
+
+GITLAB_AUTHORIZE_URL = PersistentConfig(
+    "GITLAB_AUTHORIZE_URL",
+    "oauth.gitlab.authorize_url",
+    os.environ.get("GITLAB_AUTHORIZE_URL", "https://gitlab.com/oauth/authorize"),
+)
+
+GITLAB_API_BASE_URL = PersistentConfig(
+    "GITLAB_API_BASE_URL",
+    "oauth.gitlab.api_base_url",
+    os.environ.get("GITLAB_API_BASE_URL", "https://gitlab.com/api/v4"),
+)
+
+GITLAB_USERINFO_ENDPOINT = PersistentConfig(
+    "GITLAB_USERINFO_ENDPOINT",
+    "oauth.gitlab.userinfo_endpoint",
+    os.environ.get("GITLAB_USERINFO_ENDPOINT", "https://gitlab.com/oauth/userinfo"),
+)
+
+SLACK_OAUTH_ENABLED = PersistentConfig(
+    "SLACK_OAUTH_ENABLED",
+    "oauth.slack.enabled",
+    os.environ.get("SLACK_OAUTH_ENABLED", "True").lower() == "true",
+)
+
+SLACK_CLIENT_ID = PersistentConfig(
+    "SLACK_CLIENT_ID",
+    "oauth.slack.client_id",
+    os.environ.get("SLACK_CLIENT_ID", ""),
+)
+
+SLACK_CLIENT_SECRET = PersistentConfig(
+    "SLACK_CLIENT_SECRET",
+    "oauth.slack.client_secret",
+    os.environ.get("SLACK_CLIENT_SECRET", ""),
+)
+
+SLACK_OAUTH_SCOPE = PersistentConfig(
+    "SLACK_OAUTH_SCOPE",
+    "oauth.slack.scope",
+    os.environ.get("SLACK_OAUTH_SCOPE", "openid profile email"),
+)
+
+SLACK_REDIRECT_URI = PersistentConfig(
+    "SLACK_REDIRECT_URI",
+    "oauth.slack.redirect_uri",
+    os.environ.get("SLACK_REDIRECT_URI", ""),
+)
+
+SLACK_ACCESS_TOKEN_URL = PersistentConfig(
+    "SLACK_ACCESS_TOKEN_URL",
+    "oauth.slack.access_token_url",
+    os.environ.get(
+        "SLACK_ACCESS_TOKEN_URL", "https://slack.com/api/openid.connect.token"
+    ),
+)
+
+SLACK_AUTHORIZE_URL = PersistentConfig(
+    "SLACK_AUTHORIZE_URL",
+    "oauth.slack.authorize_url",
+    os.environ.get(
+        "SLACK_AUTHORIZE_URL", "https://slack.com/openid/connect/authorize"
+    ),
+)
+
+SLACK_API_BASE_URL = PersistentConfig(
+    "SLACK_API_BASE_URL",
+    "oauth.slack.api_base_url",
+    os.environ.get("SLACK_API_BASE_URL", "https://slack.com/api"),
+)
+
+SLACK_USERINFO_ENDPOINT = PersistentConfig(
+    "SLACK_USERINFO_ENDPOINT",
+    "oauth.slack.userinfo_endpoint",
+    os.environ.get(
+        "SLACK_USERINFO_ENDPOINT", "https://slack.com/api/openid.connect.userInfo"
+    ),
+)
+
 ENABLE_OAUTH_ROLE_MANAGEMENT = PersistentConfig(
     "ENABLE_OAUTH_ROLE_MANAGEMENT",
     "oauth.enable_role_mapping",
@@ -1064,6 +1178,64 @@ def load_oauth_providers():
             "sub_claim": "id",
         }
 
+    if GITLAB_OAUTH_ENABLED.value and GITLAB_CLIENT_ID.value and GITLAB_CLIENT_SECRET.value:
+
+        def gitlab_oauth_register(oauth: OAuth):
+            client = oauth.register(
+                name="gitlab",
+                client_id=GITLAB_CLIENT_ID.value,
+                client_secret=GITLAB_CLIENT_SECRET.value,
+                access_token_url=GITLAB_ACCESS_TOKEN_URL.value,
+                authorize_url=GITLAB_AUTHORIZE_URL.value,
+                api_base_url=GITLAB_API_BASE_URL.value,
+                userinfo_endpoint=GITLAB_USERINFO_ENDPOINT.value,
+                client_kwargs={
+                    "scope": GITLAB_OAUTH_SCOPE.value,
+                    **(
+                        {"timeout": int(OAUTH_TIMEOUT.value)}
+                        if OAUTH_TIMEOUT.value
+                        else {}
+                    ),
+                },
+                redirect_uri=GITLAB_REDIRECT_URI.value,
+            )
+            return client
+
+        OAUTH_PROVIDERS["gitlab"] = {
+            "name": "GitLab",
+            "redirect_uri": GITLAB_REDIRECT_URI.value,
+            "register": gitlab_oauth_register,
+        }
+
+    if SLACK_OAUTH_ENABLED.value and SLACK_CLIENT_ID.value and SLACK_CLIENT_SECRET.value:
+
+        def slack_oauth_register(oauth: OAuth):
+            client = oauth.register(
+                name="slack",
+                client_id=SLACK_CLIENT_ID.value,
+                client_secret=SLACK_CLIENT_SECRET.value,
+                access_token_url=SLACK_ACCESS_TOKEN_URL.value,
+                authorize_url=SLACK_AUTHORIZE_URL.value,
+                api_base_url=SLACK_API_BASE_URL.value,
+                userinfo_endpoint=SLACK_USERINFO_ENDPOINT.value,
+                client_kwargs={
+                    "scope": SLACK_OAUTH_SCOPE.value,
+                    **(
+                        {"timeout": int(OAUTH_TIMEOUT.value)}
+                        if OAUTH_TIMEOUT.value
+                        else {}
+                    ),
+                },
+                redirect_uri=SLACK_REDIRECT_URI.value,
+            )
+            return client
+
+        OAUTH_PROVIDERS["slack"] = {
+            "name": "Slack",
+            "redirect_uri": SLACK_REDIRECT_URI.value,
+            "register": slack_oauth_register,
+        }
+
     configured_providers = []
     if GOOGLE_OAUTH_ENABLED.value and GOOGLE_CLIENT_ID.value:
         configured_providers.append("Google")
@@ -1075,6 +1247,10 @@ def load_oauth_providers():
         configured_providers.append("Feishu")
     if DISCORD_OAUTH_ENABLED.value and DISCORD_CLIENT_ID.value:
         configured_providers.append("Discord")
+    if GITLAB_OAUTH_ENABLED.value and GITLAB_CLIENT_ID.value:
+        configured_providers.append("GitLab")
+    if SLACK_OAUTH_ENABLED.value and SLACK_CLIENT_ID.value:
+        configured_providers.append("Slack")
 
     if configured_providers and not OPENID_PROVIDER_URL.value:
         provider_list = ", ".join(configured_providers)

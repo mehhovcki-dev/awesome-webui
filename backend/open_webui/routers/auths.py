@@ -307,6 +307,24 @@ def _serialize_admin_config(request: Request) -> dict:
         "DISCORD_AUTHORIZE_URL": request.app.state.config.DISCORD_AUTHORIZE_URL,
         "DISCORD_API_BASE_URL": request.app.state.config.DISCORD_API_BASE_URL,
         "DISCORD_USERINFO_ENDPOINT": request.app.state.config.DISCORD_USERINFO_ENDPOINT,
+        "GITLAB_OAUTH_ENABLED": request.app.state.config.GITLAB_OAUTH_ENABLED,
+        "GITLAB_CLIENT_ID": request.app.state.config.GITLAB_CLIENT_ID,
+        "GITLAB_CLIENT_SECRET": request.app.state.config.GITLAB_CLIENT_SECRET,
+        "GITLAB_OAUTH_SCOPE": request.app.state.config.GITLAB_OAUTH_SCOPE,
+        "GITLAB_REDIRECT_URI": request.app.state.config.GITLAB_REDIRECT_URI,
+        "GITLAB_ACCESS_TOKEN_URL": request.app.state.config.GITLAB_ACCESS_TOKEN_URL,
+        "GITLAB_AUTHORIZE_URL": request.app.state.config.GITLAB_AUTHORIZE_URL,
+        "GITLAB_API_BASE_URL": request.app.state.config.GITLAB_API_BASE_URL,
+        "GITLAB_USERINFO_ENDPOINT": request.app.state.config.GITLAB_USERINFO_ENDPOINT,
+        "SLACK_OAUTH_ENABLED": request.app.state.config.SLACK_OAUTH_ENABLED,
+        "SLACK_CLIENT_ID": request.app.state.config.SLACK_CLIENT_ID,
+        "SLACK_CLIENT_SECRET": request.app.state.config.SLACK_CLIENT_SECRET,
+        "SLACK_OAUTH_SCOPE": request.app.state.config.SLACK_OAUTH_SCOPE,
+        "SLACK_REDIRECT_URI": request.app.state.config.SLACK_REDIRECT_URI,
+        "SLACK_ACCESS_TOKEN_URL": request.app.state.config.SLACK_ACCESS_TOKEN_URL,
+        "SLACK_AUTHORIZE_URL": request.app.state.config.SLACK_AUTHORIZE_URL,
+        "SLACK_API_BASE_URL": request.app.state.config.SLACK_API_BASE_URL,
+        "SLACK_USERINFO_ENDPOINT": request.app.state.config.SLACK_USERINFO_ENDPOINT,
         "ENABLE_INVITE_ONLY_AUTH": request.app.state.config.ENABLE_INVITE_ONLY_AUTH,
         "INVITE_CREATOR_SCOPE": request.app.state.config.INVITE_CREATOR_SCOPE,
         "INVITE_CREATOR_GROUP_IDS": request.app.state.config.INVITE_CREATOR_GROUP_IDS,
@@ -1394,6 +1412,24 @@ class AdminConfig(BaseModel):
     DISCORD_AUTHORIZE_URL: str = "https://discord.com/oauth2/authorize"
     DISCORD_API_BASE_URL: str = "https://discord.com/api"
     DISCORD_USERINFO_ENDPOINT: str = "https://discord.com/api/users/@me"
+    GITLAB_OAUTH_ENABLED: bool = True
+    GITLAB_CLIENT_ID: str = ""
+    GITLAB_CLIENT_SECRET: str = ""
+    GITLAB_OAUTH_SCOPE: str = "openid profile email"
+    GITLAB_REDIRECT_URI: str = ""
+    GITLAB_ACCESS_TOKEN_URL: str = "https://gitlab.com/oauth/token"
+    GITLAB_AUTHORIZE_URL: str = "https://gitlab.com/oauth/authorize"
+    GITLAB_API_BASE_URL: str = "https://gitlab.com/api/v4"
+    GITLAB_USERINFO_ENDPOINT: str = "https://gitlab.com/oauth/userinfo"
+    SLACK_OAUTH_ENABLED: bool = True
+    SLACK_CLIENT_ID: str = ""
+    SLACK_CLIENT_SECRET: str = ""
+    SLACK_OAUTH_SCOPE: str = "openid profile email"
+    SLACK_REDIRECT_URI: str = ""
+    SLACK_ACCESS_TOKEN_URL: str = "https://slack.com/api/openid.connect.token"
+    SLACK_AUTHORIZE_URL: str = "https://slack.com/openid/connect/authorize"
+    SLACK_API_BASE_URL: str = "https://slack.com/api"
+    SLACK_USERINFO_ENDPOINT: str = "https://slack.com/api/openid.connect.userInfo"
     ENABLE_INVITE_ONLY_AUTH: bool = False
     INVITE_CREATOR_SCOPE: str = "admin"
     INVITE_CREATOR_GROUP_IDS: List[str] = Field(default_factory=list)
@@ -1609,6 +1645,58 @@ async def update_admin_config(
     )
     request.app.state.config.DISCORD_USERINFO_ENDPOINT = _sanitize_text(
         form_data.DISCORD_USERINFO_ENDPOINT, 1024
+    )
+
+    request.app.state.config.GITLAB_OAUTH_ENABLED = form_data.GITLAB_OAUTH_ENABLED
+    request.app.state.config.GITLAB_CLIENT_ID = _sanitize_text(
+        form_data.GITLAB_CLIENT_ID, 512
+    )
+    request.app.state.config.GITLAB_CLIENT_SECRET = _sanitize_text(
+        form_data.GITLAB_CLIENT_SECRET, 1024
+    )
+    request.app.state.config.GITLAB_OAUTH_SCOPE = _sanitize_text(
+        form_data.GITLAB_OAUTH_SCOPE, 512
+    )
+    request.app.state.config.GITLAB_REDIRECT_URI = _sanitize_text(
+        form_data.GITLAB_REDIRECT_URI, 1024
+    )
+    request.app.state.config.GITLAB_ACCESS_TOKEN_URL = _sanitize_text(
+        form_data.GITLAB_ACCESS_TOKEN_URL, 1024
+    )
+    request.app.state.config.GITLAB_AUTHORIZE_URL = _sanitize_text(
+        form_data.GITLAB_AUTHORIZE_URL, 1024
+    )
+    request.app.state.config.GITLAB_API_BASE_URL = _sanitize_text(
+        form_data.GITLAB_API_BASE_URL, 1024
+    )
+    request.app.state.config.GITLAB_USERINFO_ENDPOINT = _sanitize_text(
+        form_data.GITLAB_USERINFO_ENDPOINT, 1024
+    )
+
+    request.app.state.config.SLACK_OAUTH_ENABLED = form_data.SLACK_OAUTH_ENABLED
+    request.app.state.config.SLACK_CLIENT_ID = _sanitize_text(
+        form_data.SLACK_CLIENT_ID, 512
+    )
+    request.app.state.config.SLACK_CLIENT_SECRET = _sanitize_text(
+        form_data.SLACK_CLIENT_SECRET, 1024
+    )
+    request.app.state.config.SLACK_OAUTH_SCOPE = _sanitize_text(
+        form_data.SLACK_OAUTH_SCOPE, 512
+    )
+    request.app.state.config.SLACK_REDIRECT_URI = _sanitize_text(
+        form_data.SLACK_REDIRECT_URI, 1024
+    )
+    request.app.state.config.SLACK_ACCESS_TOKEN_URL = _sanitize_text(
+        form_data.SLACK_ACCESS_TOKEN_URL, 1024
+    )
+    request.app.state.config.SLACK_AUTHORIZE_URL = _sanitize_text(
+        form_data.SLACK_AUTHORIZE_URL, 1024
+    )
+    request.app.state.config.SLACK_API_BASE_URL = _sanitize_text(
+        form_data.SLACK_API_BASE_URL, 1024
+    )
+    request.app.state.config.SLACK_USERINFO_ENDPOINT = _sanitize_text(
+        form_data.SLACK_USERINFO_ENDPOINT, 1024
     )
 
     try:

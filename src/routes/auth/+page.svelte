@@ -591,10 +591,10 @@
 											>
 										</button>
 									{/if}
-									{#if visibleOAuthProviders.includes('github')}
-										<button
-											class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
-											on:click={() => {
+										{#if visibleOAuthProviders.includes('github')}
+											<button
+												class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
+												on:click={() => {
 												window.location.href = getOAuthLoginUrl('github');
 											}}
 										>
@@ -609,13 +609,57 @@
 													d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.92 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57C20.565 21.795 24 17.31 24 12c0-6.63-5.37-12-12-12z"
 												/>
 											</svg>
-											<span>{$i18n.t('Continue with {{provider}}', { provider: 'GitHub' })}</span>
-										</button>
-									{/if}
-									{#if visibleOAuthProviders.includes('oidc')}
-										<button
-											class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
-											on:click={() => {
+												<span>{$i18n.t('Continue with {{provider}}', { provider: 'GitHub' })}</span>
+											</button>
+										{/if}
+										{#if visibleOAuthProviders.includes('gitlab')}
+											<button
+												class="flex justify-center items-center bg-orange-500/10 hover:bg-orange-500/20 text-orange-700 dark:text-orange-300 transition w-full rounded-full font-medium text-sm py-2.5"
+												on:click={() => {
+													window.location.href = getOAuthLoginUrl('gitlab');
+												}}
+											>
+												<svg
+													xmlns="http://www.w3.org/2000/svg"
+													viewBox="0 0 24 24"
+													class="size-6 mr-3"
+													aria-hidden="true"
+												>
+													<path
+														fill="currentColor"
+														d="m22.5 9.5-2.1-6.5a.8.8 0 0 0-.76-.54H4.36a.8.8 0 0 0-.76.54L1.5 9.5a1.43 1.43 0 0 0 .52 1.6l9.47 7.02 9.47-7.02a1.43 1.43 0 0 0 .52-1.6Z"
+													/>
+													<path fill="#FC6D26" d="M12 18.2 15.5 7.4h-7L12 18.2Z" />
+													<path fill="#FCA326" d="M8.5 7.4 6.9 2.5H4.3l4.2 4.9Z" />
+												</svg>
+												<span>{$i18n.t('Continue with {{provider}}', { provider: 'GitLab' })}</span>
+											</button>
+										{/if}
+										{#if visibleOAuthProviders.includes('slack')}
+											<button
+												class="flex justify-center items-center bg-purple-500/10 hover:bg-purple-500/20 text-purple-700 dark:text-purple-300 transition w-full rounded-full font-medium text-sm py-2.5"
+												on:click={() => {
+													window.location.href = getOAuthLoginUrl('slack');
+												}}
+											>
+												<svg
+													xmlns="http://www.w3.org/2000/svg"
+													viewBox="0 0 24 24"
+													class="size-6 mr-3"
+													aria-hidden="true"
+												>
+													<path
+														fill="currentColor"
+														d="M6.3 15.2a2 2 0 1 1-2 2h2v-2Zm1 0h3v2a2 2 0 1 1-2-2h-1v-0Zm1-8a2 2 0 1 1 2 2h-2v-2Zm0 1h2.9v3H8.3a2 2 0 1 1 0-3Zm8 1a2 2 0 1 1 2-2v2h-2Zm-1 0V6.3h2v2.9a2 2 0 1 1-2 0Zm1 8a2 2 0 1 1-2-2h2v2Zm-1-1h-2.9v-3h2.9a2 2 0 1 1 0 3Z"
+													/>
+												</svg>
+												<span>{$i18n.t('Continue with {{provider}}', { provider: 'Slack' })}</span>
+											</button>
+										{/if}
+										{#if visibleOAuthProviders.includes('oidc')}
+											<button
+												class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
+												on:click={() => {
 												window.location.href = getOAuthLoginUrl('oidc');
 											}}
 										>
