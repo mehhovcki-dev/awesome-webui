@@ -1,4 +1,6 @@
 <script lang="ts">
+	import DOMPurify from 'dompurify';
+	import { marked } from 'marked';
 	import { getContext, onDestroy, onMount } from 'svelte';
 	import { get } from 'svelte/store';
 	import { toast } from 'svelte-sonner';
@@ -41,6 +43,19 @@
 		MOTD_CONTENT: String(configData?.MOTD_CONTENT ?? '')
 	});
 
+	const renderGuestPreviewDescription = (content: string) => {
+		try {
+			return DOMPurify.sanitize(String(marked.parse(String(content ?? ''))));
+		} catch {
+			return DOMPurify.sanitize(String(content ?? ''));
+		}
+	};
+
+	$: guestPreviewTitle =
+		String(adminConfig?.SYSTEM_NOTICE_TITLE ?? '').trim() || t('Notice');
+	$: guestPreviewDescription = String(adminConfig?.SYSTEM_NOTICE_CONTENT ?? '');
+	$: guestPreviewDescriptionHtml = renderGuestPreviewDescription(guestPreviewDescription);
+
 	type SaveOptions = {
 		silent?: boolean;
 	};
@@ -53,10 +68,10 @@
 
 		const payload = {
 			...adminConfig,
-			SYSTEM_NOTICE_TITLE: String(adminConfig.SYSTEM_NOTICE_TITLE || '').trim(),
-			SYSTEM_NOTICE_CONTENT: String(adminConfig.SYSTEM_NOTICE_CONTENT || '').trim(),
-			MOTD_TITLE: String(adminConfig.MOTD_TITLE || 'Message of the day!').trim(),
-			MOTD_CONTENT: String(adminConfig.MOTD_CONTENT || '').trim()
+			SYSTEM_NOTICE_TITLE: String(adminConfig.SYSTEM_NOTICE_TITLE ?? ''),
+			SYSTEM_NOTICE_CONTENT: String(adminConfig.SYSTEM_NOTICE_CONTENT ?? ''),
+			MOTD_TITLE: String(adminConfig.MOTD_TITLE ?? 'Message of the day!'),
+			MOTD_CONTENT: String(adminConfig.MOTD_CONTENT ?? '')
 		};
 
 		const response = await updateAdminConfig(localStorage.token, payload).catch((error) => {
@@ -64,11 +79,9 @@
 			return null;
 		});
 
-		if (response) {
+		if (response && !silent) {
 			adminConfig = normalizeAdminConfig(response);
-			if (!silent) {
-				toast.success(t('Notice settings updated'));
-			}
+			toast.success(t('Notice settings updated'));
 		}
 	};
 
@@ -126,7 +139,7 @@
 
 <form
 	class="flex flex-col h-full justify-between space-y-3 text-sm"
-	on:submit|preventDefault={saveHandler}
+	on:submit|preventDefault={() => saveHandler()}
 >
 	<div class="space-y-3 overflow-y-scroll scrollbar-hidden h-full">
 		{#if adminConfig}
@@ -179,6 +192,42 @@
 							></textarea>
 							<div class="text-[11px] text-gray-500 dark:text-gray-400 mt-1">
 								{$i18n.t('Markdown is supported.')}
+							</div>
+						</div>
+
+						<div class="sm:col-span-2">
+							<div class="text-xs font-medium mb-1">{$i18n.t('Live Guest Preview')}</div>
+							<div class="rounded-xl border border-gray-200/80 dark:border-gray-800 p-3 bg-white/50 dark:bg-gray-950/30">
+								<div
+									class="mb-1 w-full rounded-2xl border border-gray-200/80 dark:border-gray-800/90 bg-gray-50/80 dark:bg-gray-900/70 p-4 sm:p-5 text-left shadow-sm {adminConfig.ENABLE_SYSTEM_NOTICE
+										? ''
+										: 'opacity-60'}"
+								>
+									<div
+										class="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100"
+									>
+										{guestPreviewTitle}
+									</div>
+									{#if guestPreviewDescription.trim().length > 0}
+										<div
+											class="mt-2 text-sm leading-relaxed text-gray-700 dark:text-gray-300 marked"
+										>
+											{@html guestPreviewDescriptionHtml}
+										</div>
+									{:else}
+										<div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+											{$i18n.t('Notification description is empty.')}
+										</div>
+									{/if}
+								</div>
+
+								<div class="text-[11px] text-gray-500 dark:text-gray-400">
+									{#if adminConfig.ENABLE_SYSTEM_NOTICE}
+										{$i18n.t('Preview reflects how this card appears to guests on the auth page.')}
+									{:else}
+										{$i18n.t('Guest notification is currently disabled.')}
+									{/if}
+								</div>
 							</div>
 						</div>
 					</div>

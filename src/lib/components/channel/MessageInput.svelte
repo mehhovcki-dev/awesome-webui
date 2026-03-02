@@ -311,6 +311,78 @@
 		}
 	};
 
+	type GifPickerAsset = {
+		url?: string;
+	};
+
+	type GifPickerSelection = {
+		id?: string | number;
+		slug?: string;
+		title?: string;
+		file?: {
+			hd?: {
+				gif?: GifPickerAsset;
+				webp?: GifPickerAsset;
+			};
+			md?: {
+				gif?: GifPickerAsset;
+				webp?: GifPickerAsset;
+			};
+			sm?: {
+				gif?: GifPickerAsset;
+				webp?: GifPickerAsset;
+				jpg?: GifPickerAsset;
+			};
+			xs?: {
+				gif?: GifPickerAsset;
+				webp?: GifPickerAsset;
+				jpg?: GifPickerAsset;
+			};
+		};
+	};
+
+	const resolveGifInsertUrl = (gif: GifPickerSelection) =>
+		String(
+			gif?.file?.md?.gif?.url ??
+				gif?.file?.sm?.gif?.url ??
+				gif?.file?.xs?.gif?.url ??
+				gif?.file?.hd?.gif?.url ??
+				gif?.file?.md?.webp?.url ??
+				gif?.file?.sm?.webp?.url ??
+				gif?.file?.xs?.webp?.url ??
+				gif?.file?.hd?.webp?.url ??
+				gif?.file?.sm?.jpg?.url ??
+				gif?.file?.xs?.jpg?.url ??
+				gif?.file?.md?.jpg?.url ??
+				gif?.file?.hd?.jpg?.url ??
+				gif?.file?.md?.mp4?.url ??
+				gif?.file?.sm?.mp4?.url ??
+				gif?.file?.xs?.mp4?.url ??
+				gif?.file?.hd?.mp4?.url ??
+				gif?.file?.md?.webm?.url ??
+				gif?.file?.sm?.webm?.url ??
+				gif?.file?.xs?.webm?.url ??
+				gif?.file?.hd?.webm?.url ??
+				''
+		).trim();
+
+	const handleGifSubmitFromPicker = async (gif: GifPickerSelection) => {
+		const gifUrl = resolveGifInsertUrl(gif);
+		if (!gifUrl) {
+			toast.error($i18n.t('Unable to insert GIF right now.'));
+			return;
+		}
+
+		await Promise.resolve(
+			onSubmit({
+				content: gifUrl,
+				data: {
+					files: []
+				}
+			})
+		);
+	};
+
 	let command = '';
 
 	export let showCommands = false;
@@ -997,6 +1069,9 @@
 											} else {
 												await insertTextAtCursor(`:${name}:`);
 											}
+										}}
+										onGifSubmit={async (gif) => {
+											await handleGifSubmitFromPicker(gif);
 										}}
 									>
 										<Tooltip content={$i18n.t('Insert emoji')}>

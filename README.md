@@ -90,7 +90,7 @@ Priority guide: `HIGH` (soon), `MEDIUM`, `LOW`, `XLOW` (later).
 - [x] `LOW` Discord OAuth
 
 ### User Interface
-- [ ] `LOW` Add GIFs to channels
+- [x] `LOW` Add GIFs to channels
 - [x] `LOW` Notification changes for channels
 - [x] `LOW` Integrate GIF search with emojis and custom emojis
 

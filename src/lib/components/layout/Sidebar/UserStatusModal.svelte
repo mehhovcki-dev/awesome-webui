@@ -104,6 +104,7 @@
 							class="flex items-center px-2.5 py-2 gap-3 border border-gray-100/50 dark:border-gray-850/50 rounded-xl"
 						>
 							<EmojiPicker
+								showGifTab={false}
 								onClose={() => {}}
 								onSubmit={(name) => {
 									console.log(name);

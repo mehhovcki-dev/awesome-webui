@@ -11,7 +11,6 @@
 	import { WEBUI_BASE_URL } from '$lib/constants';
 	import { copyToClipboard, unescapeHtml } from '$lib/utils';
 
-	import Image from '$lib/components/common/Image.svelte';
 	import KatexRenderer from './KatexRenderer.svelte';
 	import Source from './Source.svelte';
 	import HtmlToken from './HTMLToken.svelte';
@@ -19,6 +18,7 @@
 	import CodespanToken from './MarkdownInlineTokens/CodespanToken.svelte';
 	import MentionToken from './MarkdownInlineTokens/MentionToken.svelte';
 	import NoteLinkToken from './MarkdownInlineTokens/NoteLinkToken.svelte';
+	import LinkEmbed from './MarkdownInlineTokens/LinkEmbed.svelte';
 	import SourceToken from './SourceToken.svelte';
 
 	export let id: string;
@@ -65,6 +65,27 @@
 			// Invalid URL, let browser handle it
 		}
 	};
+
+	const isWhitespaceOnlyTextToken = (token: Token) => {
+		if (token.type !== 'text' && token.type !== 'escape') {
+			return false;
+		}
+
+		return !String((token as { text?: string }).text ?? '').trim();
+	};
+
+	const isStandaloneLinkToken = (items: Token[], linkIndex: number) =>
+		items.every((candidate, candidateIdx) => {
+			if (candidateIdx === linkIndex) {
+				return true;
+			}
+
+			if (candidate.type === 'br') {
+				return true;
+			}
+
+			return isWhitespaceOnlyTextToken(candidate);
+		});
 </script>
 
 {#each tokens as token, tokenIdx (tokenIdx)}
@@ -77,26 +98,36 @@
 		{#if noteId}
 			<NoteLinkToken {noteId} href={token.href} />
 		{:else if token.tokens}
-			<a
-				href={token.href}
-				target="_blank"
-				rel="nofollow"
-				title={token.title}
-				on:click={(e) => handleLinkClick(e, token.href)}
-			>
-				<svelte:self id={`${id}-a`} tokens={token.tokens} {onSourceClick} {done} />
-			</a>
+			<span class="inline-block max-w-full">
+				<a
+					href={token.href}
+					target="_blank"
+					rel="nofollow"
+					title={token.title}
+					on:click={(e) => handleLinkClick(e, token.href)}
+				>
+					<svelte:self id={`${id}-a`} tokens={token.tokens} {onSourceClick} {done} />
+				</a>
+				{#if isStandaloneLinkToken(tokens, tokenIdx)}
+					<LinkEmbed href={token.href} />
+				{/if}
+			</span>
 		{:else}
-			<a
-				href={token.href}
-				target="_blank"
-				rel="nofollow"
-				title={token.title}
-				on:click={(e) => handleLinkClick(e, token.href)}>{token.text}</a
-			>
+			<span class="inline-block max-w-full">
+				<a
+					href={token.href}
+					target="_blank"
+					rel="nofollow"
+					title={token.title}
+					on:click={(e) => handleLinkClick(e, token.href)}>{token.text}</a
+				>
+				{#if isStandaloneLinkToken(tokens, tokenIdx)}
+					<LinkEmbed href={token.href} />
+				{/if}
+			</span>
 		{/if}
 	{:else if token.type === 'image'}
-		<Image src={token.href} alt={token.text} />
+		<LinkEmbed href={token.href} alt={token.text} forceImage={true} />
 	{:else if token.type === 'strong'}
 		<strong><svelte:self id={`${id}-strong`} tokens={token.tokens} {onSourceClick} /></strong>
 	{:else if token.type === 'em'}

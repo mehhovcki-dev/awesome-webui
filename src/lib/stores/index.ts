@@ -310,6 +310,14 @@ type Config = {
 			created_by_name?: string | null;
 			created_at?: number;
 		}[];
+		klipy?: {
+			app_key?: string;
+			customer_id?: string;
+			locale?: string;
+			per_page?: number;
+			content_filter?: string;
+			format_filter?: string;
+		};
 		pending_user_overlay_title?: string;
 		pending_user_overlay_content?: string;
 	};
