@@ -132,9 +132,10 @@ if "cuda_error" in locals():
 
 SRC_LOG_LEVELS = {}  # Legacy variable, do not remove
 
-WEBUI_NAME = os.environ.get("WEBUI_NAME", "Open WebUI")
-if WEBUI_NAME != "Open WebUI":
-    WEBUI_NAME += " (Open WebUI)"
+DEFAULT_WEBUI_NAME = "Awesome WebUI"
+WEBUI_NAME = os.environ.get("WEBUI_NAME", DEFAULT_WEBUI_NAME)
+if WEBUI_NAME != DEFAULT_WEBUI_NAME:
+    WEBUI_NAME += f" ({DEFAULT_WEBUI_NAME})"
 
 WEBUI_FAVICON_URL = "https://openwebui.com/favicon.png"
 
@@ -301,6 +302,123 @@ if FROM_INIT_PY:
         shutil.rmtree(DATA_DIR)
 
     DATA_DIR = Path(os.getenv("DATA_DIR", OPEN_WEBUI_DIR / "data"))
+
+
+def _iter_data_dir_entries(path: Path):
+    if not path.exists() or not path.is_dir():
+        return []
+    return [
+        item
+        for item in path.iterdir()
+        if item.name not in {".gitkeep", ".keep", ".DS_Store"}
+    ]
+
+
+def _looks_like_open_webui_data(path: Path) -> bool:
+    if not path.exists() or not path.is_dir():
+        return False
+
+    common_markers = (
+        "webui.db",
+        "ollama.db",
+        "config.json",
+        "uploads",
+        "cache",
+        "vector_db",
+    )
+    return any((path / marker).exists() for marker in common_markers)
+
+
+def _copy_data_dir(source: Path, destination: Path):
+    destination.mkdir(parents=True, exist_ok=True)
+    for item in source.iterdir():
+        target = destination / item.name
+        if item.is_dir():
+            shutil.copytree(item, target, dirs_exist_ok=True)
+        else:
+            shutil.copy2(item, target)
+
+
+def _find_open_webui_data_sources(explicit_source: str) -> list[Path]:
+    candidates: list[Path] = []
+
+    if explicit_source.strip():
+        candidates.append(Path(explicit_source).expanduser().resolve())
+
+    # Common sibling project names in local dev setups.
+    sibling_roots = [
+        BASE_DIR.parent / "open-webui",
+        BASE_DIR.parent / "open-webui-main",
+        BASE_DIR.parent / "open-webui-dev",
+    ]
+
+    for root in sibling_roots:
+        candidates.extend(
+            [
+                root / "backend" / "data",
+                root / "backend" / "open_webui" / "data",
+                root / "data",
+            ]
+        )
+
+    unique_candidates: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        key = str(candidate)
+        if key not in seen:
+            seen.add(key)
+            unique_candidates.append(candidate)
+
+    return unique_candidates
+
+
+ENABLE_OPEN_WEBUI_DATA_MIGRATION = (
+    os.environ.get("ENABLE_OPEN_WEBUI_DATA_MIGRATION", "True").lower() == "true"
+)
+OPEN_WEBUI_DATA_MIGRATION_SOURCE = os.environ.get(
+    "OPEN_WEBUI_DATA_MIGRATION_SOURCE", ""
+)
+OPEN_WEBUI_DATA_MIGRATION_FORCE = (
+    os.environ.get("OPEN_WEBUI_DATA_MIGRATION_FORCE", "False").lower() == "true"
+)
+
+if ENABLE_OPEN_WEBUI_DATA_MIGRATION:
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    migration_marker = DATA_DIR / ".awesome_webui_migrated_from_open_webui"
+
+    destination_has_data = len(_iter_data_dir_entries(DATA_DIR)) > 0
+    can_migrate = (
+        OPEN_WEBUI_DATA_MIGRATION_FORCE
+        or (
+            not destination_has_data
+            and not migration_marker.exists()
+        )
+    )
+
+    if can_migrate:
+        source_candidates = _find_open_webui_data_sources(
+            OPEN_WEBUI_DATA_MIGRATION_SOURCE
+        )
+        for source in source_candidates:
+            if source == DATA_DIR:
+                continue
+            if not _looks_like_open_webui_data(source):
+                continue
+
+            try:
+                log.info(f"Migrating data from Open WebUI source: {source} -> {DATA_DIR}")
+                _copy_data_dir(source, DATA_DIR)
+                migration_marker.write_text(
+                    datetime.now(timezone.utc).isoformat(), encoding="utf-8"
+                )
+                log.info(
+                    "Open WebUI data migration completed successfully."
+                )
+                break
+            except Exception as migration_error:
+                log.warning(
+                    f"Failed to migrate data from {source}: {migration_error}"
+                )
 
 STATIC_DIR = Path(os.getenv("STATIC_DIR", OPEN_WEBUI_DIR / "static"))
 

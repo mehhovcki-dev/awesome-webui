@@ -1,4 +1,4 @@
-﻿# Awesome WebUI 👋
+# Awesome WebUI 👋
 >This `README.md` is also available in other languages:
 <br>\- 🇺🇸 English <small>[You are currently here!]</small>
 <br>\- 🇷🇺 [Русский](README.RU.MD)
@@ -95,5 +95,5 @@ Priority guide: `HIGH` (soon), `MEDIUM`, `LOW`, `XLOW` (later).
 - [x] `LOW` Integrate GIF search with emojis and custom emojis
 
 ### General
-- [ ] `?` Add migration support for files (such as DB) from default Open WebUI
-- [ ] `XLOW` Add translations for new features
+- [x] `?` Add migration support for files (such as DB) from default Open WebUI
+- [x] `XLOW` Add translations for new features
