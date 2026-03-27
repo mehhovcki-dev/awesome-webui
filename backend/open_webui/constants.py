@@ -22,6 +22,7 @@ class ERROR_MESSAGES(str, Enum):
     DELETE_USER_ERROR = 'Oops! Something went wrong. We encountered an issue while trying to delete the user. Please give it another shot.'
     EMAIL_MISMATCH = 'Uh-oh! This email does not match the email your provider is registered with. Please check your email and try again.'
     EMAIL_TAKEN = 'Uh-oh! This email is already registered. Sign in with your existing account or choose another email to start anew.'
+    OAUTH_EMAIL_TAKEN = 'This email already belongs to an existing account. Sign in first, then link this SSO provider from Account settings.'
     USERNAME_TAKEN = 'Uh-oh! This username is already registered. Please choose another username.'
     PASSWORD_TOO_LONG = (
         'Uh-oh! The password you entered is too long. Please make sure your password is less than 72 bytes long.'
@@ -90,6 +91,7 @@ class ERROR_MESSAGES(str, Enum):
     )
 
     INVALID_PASSWORD = lambda err='': err if err else 'The password does not meet the required validation criteria.'
+    PASSWORD_REQUIRED_FOR_OAUTH_UNLINK = 'Set a password before unlinking your last SSO provider so you do not lock yourself out.'
 
 
 class TASKS(str, Enum):

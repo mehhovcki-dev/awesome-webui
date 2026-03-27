@@ -6,7 +6,8 @@
 
 	import { goto } from '$app/navigation';
 
-	import { updateUserById, getUserGroupsById } from '$lib/apis/users';
+	import { updateUserById, getUserGroupsById, resetUserPasswordById } from '$lib/apis/users';
+	import { copyToClipboard } from '$lib/utils';
 
 	import Modal from '$lib/components/common/Modal.svelte';
 	import localizedFormat from 'dayjs/plugin/localizedFormat';
@@ -30,6 +31,8 @@
 		if (selectedUser) {
 			_user = selectedUser;
 			_user.password = '';
+			generatedPassword = '';
+			generatedPasswordCopied = false;
 			loadUserGroups();
 		}
 	};
@@ -43,6 +46,8 @@
 	};
 
 	let userGroups: any[] | null = null;
+	let generatedPassword = '';
+	let generatedPasswordCopied = false;
 
 	const submitHandler = async () => {
 		const res = await updateUserById(localStorage.token, selectedUser.id, _user).catch((error) => {
@@ -63,6 +68,24 @@
 			toast.error(`${error}`);
 			return null;
 		});
+	};
+
+	const resetPasswordHandler = async () => {
+		const res = await resetUserPasswordById(localStorage.token, selectedUser.id).catch((error) => {
+			toast.error(`${error}`);
+			return null;
+		});
+
+		if (!res?.password) {
+			return;
+		}
+
+		generatedPassword = res.password;
+		generatedPasswordCopied = false;
+		dispatch('save');
+		toast.success(
+			$i18n.t('Temporary password generated. The user will be asked to change it after sign-in.')
+		);
 	};
 </script>
 
@@ -213,6 +236,41 @@
 												required={false}
 											/>
 										</div>
+									</div>
+
+									<div class="flex flex-col w-full rounded-lg border border-gray-100 dark:border-gray-850/80 p-3 gap-2">
+										<div class="text-xs text-gray-500">
+											{$i18n.t('Reset the password to a generated temporary value and require the user to choose a new one after sign-in.')}
+										</div>
+
+										<div class="flex flex-wrap gap-2 items-center">
+											<button
+												class="px-3 py-1.5 text-xs font-medium rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-850 dark:hover:bg-gray-800 transition"
+												type="button"
+												on:click={resetPasswordHandler}
+											>
+												{$i18n.t('Generate reset password')}
+											</button>
+										</div>
+
+										{#if generatedPassword}
+											<div class="flex items-center gap-2">
+												<SensitiveInput value={generatedPassword} readOnly={true} />
+												<button
+													class="px-2.5 py-1.5 text-xs font-medium rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-850 dark:hover:bg-gray-800 transition"
+													type="button"
+													on:click={() => {
+														copyToClipboard(generatedPassword);
+														generatedPasswordCopied = true;
+														setTimeout(() => {
+															generatedPasswordCopied = false;
+														}, 2000);
+													}}
+												>
+													{generatedPasswordCopied ? $i18n.t('Copied') : $i18n.t('Copy')}
+												</button>
+											</div>
+										{/if}
 									</div>
 								</div>
 							</div>

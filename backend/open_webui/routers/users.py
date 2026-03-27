@@ -1,4 +1,5 @@
 import logging
+import secrets
 from typing import Optional
 from sqlalchemy.orm import Session
 import base64
@@ -44,6 +45,19 @@ from open_webui.utils.access_control import get_permissions, has_permission
 log = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _generate_temporary_password() -> str:
+    return f"awesomewebui{secrets.randbelow(100_000_000):08d}"
+
+
+class PasswordResetResponse(BaseModel):
+    password: str
+    password_change_required: bool = True
+
+
+class UserOAuthResponse(BaseModel):
+    oauth: Optional[dict] = None
 
 
 ############################
@@ -591,6 +605,87 @@ async def get_user_oauth_sessions_by_id(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=ERROR_MESSAGES.USER_NOT_FOUND,
         )
+
+
+@router.delete("/user/oauth/{provider}", response_model=UserOAuthResponse)
+async def unlink_user_oauth_provider(
+    provider: str,
+    user=Depends(get_verified_user),
+    db: Session = Depends(get_session),
+):
+    normalized_provider = str(provider or "").strip().lower()
+    if not normalized_provider:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ERROR_MESSAGES.DEFAULT("OAuth provider is required."),
+        )
+
+    session_user = Users.get_user_by_id(user.id, db=db)
+    if not session_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ERROR_MESSAGES.USER_NOT_FOUND,
+        )
+
+    linked_oauth = dict(session_user.oauth or {})
+    if normalized_provider not in linked_oauth:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ERROR_MESSAGES.DEFAULT("This SSO provider is not linked."),
+        )
+
+    auth = Auths.get_auth_by_id(user.id, db=db)
+    if len(linked_oauth) <= 1 and (not auth or not auth.password_login_enabled):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ERROR_MESSAGES.PASSWORD_REQUIRED_FOR_OAUTH_UNLINK,
+        )
+
+    updated_user = Users.delete_user_oauth_by_id(user.id, normalized_provider, db=db)
+    if not updated_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ERROR_MESSAGES.DEFAULT(),
+        )
+
+    for session in OAuthSessions.get_sessions_by_user_id(user.id, db=db):
+        if session.provider == normalized_provider:
+            OAuthSessions.delete_session_by_id(session.id, db=db)
+
+    return {"oauth": updated_user.oauth}
+
+
+@router.post("/{user_id}/password/reset", response_model=PasswordResetResponse)
+async def reset_user_password_by_id(
+    user_id: str,
+    user=Depends(get_admin_user),
+    db: Session = Depends(get_session),
+):
+    target_user = Users.get_user_by_id(user_id, db=db)
+    if not target_user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ERROR_MESSAGES.USER_NOT_FOUND,
+        )
+
+    temporary_password = _generate_temporary_password()
+    password_updated = Auths.update_user_password_by_id(
+        user_id,
+        get_password_hash(temporary_password),
+        password_change_required=True,
+        password_login_enabled=True,
+        db=db,
+    )
+    if not password_updated:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=ERROR_MESSAGES.DEFAULT("Failed to reset the user's password."),
+        )
+
+    return {
+        "password": temporary_password,
+        "password_change_required": True,
+    }
 
 
 ############################

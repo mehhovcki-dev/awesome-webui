@@ -1807,7 +1807,9 @@ class OAuthManager:
                     # Check if an existing user with the same email already exists
                     existing_user = Users.get_user_by_email(email, db=db)
                     if existing_user:
-                        raise HTTPException(400, detail=ERROR_MESSAGES.EMAIL_TAKEN)
+                        raise HTTPException(
+                            400, detail=ERROR_MESSAGES.OAUTH_EMAIL_TAKEN
+                        )
 
                     if (
                         request.app.state.config.ENABLE_INVITE_ONLY_AUTH
@@ -1854,6 +1856,8 @@ class OAuthManager:
                         profile_image_url=picture_url,
                         role=self.get_user_role(None, user_data),
                         oauth=oauth_data,
+                        password_change_required=True,
+                        password_login_enabled=False,
                         db=db,
                     )
 

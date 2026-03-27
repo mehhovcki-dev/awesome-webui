@@ -1,27 +1,77 @@
 <script lang="ts">
 	import { getContext } from 'svelte';
 	import { toast } from 'svelte-sonner';
-	import { updateUserPassword } from '$lib/apis/auths';
+	import { getSessionUser, updateUserPassword } from '$lib/apis/auths';
+	import { user } from '$lib/stores';
 	import SensitiveInput from '$lib/components/common/SensitiveInput.svelte';
 
 	const i18n = getContext('i18n');
 
-	let show = false;
+	export let showByDefault = false;
+	export let forceSetup = false;
+	export let title: string | null = null;
+	export let description: string | null = null;
+	export let submitLabel: string | null = null;
+	export let hideToggle = false;
+	export let onSuccess: (() => void | Promise<void>) | null = null;
+
+	let show = showByDefault;
 	let currentPassword = '';
 	let newPassword = '';
 	let newPasswordConfirm = '';
 
+	$: if (showByDefault) {
+		show = true;
+	}
+
+	$: requiresCurrentPassword =
+		!forceSetup && !($user?.password_change_required || $user?.has_password === false);
+
+	$: resolvedTitle =
+		title ??
+		(requiresCurrentPassword ? $i18n.t('Change Password') : $i18n.t('Set Password'));
+
+	$: resolvedDescription =
+		description ??
+		(requiresCurrentPassword
+			? ''
+			: $i18n.t('Choose a password for your account before continuing.'));
+
+	$: resolvedSubmitLabel =
+		submitLabel ??
+		(requiresCurrentPassword ? $i18n.t('Update password') : $i18n.t('Set password'));
+
 	const updatePasswordHandler = async () => {
+		if (requiresCurrentPassword && !currentPassword.trim()) {
+			toast.error($i18n.t('Enter your current password.'));
+			return;
+		}
+
 		if (newPassword === newPasswordConfirm) {
-			const res = await updateUserPassword(localStorage.token, currentPassword, newPassword).catch(
-				(error) => {
-					toast.error(`${error}`);
-					return null;
-				}
-			);
+			const res = await updateUserPassword(
+				localStorage.token,
+				requiresCurrentPassword ? currentPassword : null,
+				newPassword
+			).catch((error) => {
+				toast.error(`${error}`);
+				return null;
+			});
 
 			if (res) {
+				const sessionUser = await getSessionUser(localStorage.token).catch((error) => {
+					toast.error(`${error}`);
+					return null;
+				});
+
+				if (sessionUser) {
+					await user.set(sessionUser);
+				}
+
 				toast.success($i18n.t('Successfully updated.'));
+
+				if (onSuccess) {
+					await onSuccess();
+				}
 			}
 
 			currentPassword = '';
@@ -44,32 +94,40 @@
 	}}
 >
 	<div class="flex justify-between items-center text-sm">
-		<div class="  font-medium">{$i18n.t('Change Password')}</div>
-		<button
-			class=" text-xs font-medium text-gray-500"
-			type="button"
-			on:click={() => {
-				show = !show;
-			}}>{show ? $i18n.t('Hide') : $i18n.t('Show')}</button
-		>
+		<div class="font-medium">{resolvedTitle}</div>
+		{#if !hideToggle}
+			<button
+				class=" text-xs font-medium text-gray-500"
+				type="button"
+				on:click={() => {
+					show = !show;
+				}}>{show ? $i18n.t('Hide') : $i18n.t('Show')}</button
+			>
+		{/if}
 	</div>
 
 	{#if show}
 		<div class=" py-2.5 space-y-1.5">
-			<div class="flex flex-col w-full">
-				<div class=" mb-1 text-xs text-gray-500">{$i18n.t('Current Password')}</div>
+			{#if resolvedDescription}
+				<div class="text-xs text-gray-500">{resolvedDescription}</div>
+			{/if}
 
-				<div class="flex-1">
-					<SensitiveInput
-						class="w-full bg-transparent text-sm dark:text-gray-300 outline-hidden placeholder:opacity-30"
-						type="password"
-						bind:value={currentPassword}
-						placeholder={$i18n.t('Enter your current password')}
-						autocomplete="current-password"
-						required
-					/>
+			{#if requiresCurrentPassword}
+				<div class="flex flex-col w-full">
+					<div class=" mb-1 text-xs text-gray-500">{$i18n.t('Current Password')}</div>
+
+					<div class="flex-1">
+						<SensitiveInput
+							class="w-full bg-transparent text-sm dark:text-gray-300 outline-hidden placeholder:opacity-30"
+							type="password"
+							bind:value={currentPassword}
+							placeholder={$i18n.t('Enter your current password')}
+							autocomplete="current-password"
+							required
+						/>
+					</div>
 				</div>
-			</div>
+			{/if}
 
 			<div class="flex flex-col w-full">
 				<div class=" mb-1 text-xs text-gray-500">{$i18n.t('New Password')}</div>
@@ -106,7 +164,7 @@
 			<button
 				class="px-3.5 py-1.5 text-sm font-medium bg-black hover:bg-gray-900 text-white dark:bg-white dark:text-black dark:hover:bg-gray-100 transition rounded-full"
 			>
-				{$i18n.t('Update password')}
+				{resolvedSubmitLabel}
 			</button>
 		</div>
 	{/if}

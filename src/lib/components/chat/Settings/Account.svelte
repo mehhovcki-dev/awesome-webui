@@ -4,6 +4,7 @@
 
 	import { user, config, settings } from '$lib/stores';
 	import { updateUserProfile, createAPIKey, getAPIKey, getSessionUser } from '$lib/apis/auths';
+	import { unlinkCurrentUserOAuthProvider } from '$lib/apis/users';
 	import { WEBUI_BASE_URL } from '$lib/constants';
 
 	import UpdatePassword from './Account/UpdatePassword.svelte';
@@ -75,6 +76,34 @@
 
 		const redirectPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
 		window.location.href = `${WEBUI_BASE_URL}/oauth/${encodeURIComponent(providerId)}/login?mode=connect&redirect=${encodeURIComponent(redirectPath)}`;
+	};
+
+	const unlinkOAuthProvider = async (providerId: string) => {
+		const response = await unlinkCurrentUserOAuthProvider(localStorage.token, providerId).catch(
+			(error) => {
+				toast.error(`${error}`);
+				return null;
+			}
+		);
+
+		if (!response) {
+			return;
+		}
+
+		const sessionUser = await getSessionUser(localStorage.token).catch((error) => {
+			toast.error(`${error}`);
+			return null;
+		});
+
+		if (sessionUser) {
+			await user.set(sessionUser);
+		}
+
+		toast.success(
+			$i18n.t('Disconnected {{provider}} from your account.', {
+				provider: getOAuthProviderLabel(providerId)
+			})
+		);
 	};
 
 	const handleOAuthLinkStatus = () => {
@@ -321,7 +350,10 @@
 
 		{#if $config?.features.enable_login_form}
 			<div class="mt-2">
-				<UpdatePassword />
+				<UpdatePassword
+					showByDefault={$user?.password_change_required || $user?.has_password === false}
+					hideToggle={$user?.password_change_required || $user?.has_password === false}
+				/>
 			</div>
 		{/if}
 
@@ -341,11 +373,20 @@
 						>
 							<div class="text-sm">{provider.label}</div>
 							{#if isOAuthProviderLinked(provider.id)}
-								<span
-									class="text-xs font-medium px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
-								>
-									{$i18n.t('Linked')}
-								</span>
+								<div class="flex items-center gap-2">
+									<span
+										class="text-xs font-medium px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+									>
+										{$i18n.t('Linked')}
+									</span>
+									<button
+										type="button"
+										class="text-xs font-medium px-2.5 py-1.5 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-850 dark:hover:bg-gray-800 transition"
+										on:click={() => unlinkOAuthProvider(provider.id)}
+									>
+										{$i18n.t('Unlink')}
+									</button>
+								</div>
 							{:else}
 								<button
 									type="button"

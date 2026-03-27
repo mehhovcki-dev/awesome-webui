@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from open_webui.internal.db import Base, JSONField, get_db, get_db_context
 from open_webui.models.users import User, UserModel, UserProfileImageResponse, Users
 from open_webui.utils.validate import validate_profile_image_url
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy import Boolean, Column, String, Text
 
 log = logging.getLogger(__name__)
@@ -23,6 +23,8 @@ class Auth(Base):
     email = Column(String)
     password = Column(Text)
     active = Column(Boolean)
+    password_change_required = Column(Boolean, nullable=False, default=False)
+    password_login_enabled = Column(Boolean, nullable=False, default=True)
 
 
 class AuthModel(BaseModel):
@@ -30,6 +32,10 @@ class AuthModel(BaseModel):
     email: str
     password: str
     active: bool = True
+    password_change_required: bool = False
+    password_login_enabled: bool = True
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 ####################
@@ -65,7 +71,7 @@ class ProfileImageUrlForm(BaseModel):
 
 
 class UpdatePasswordForm(BaseModel):
-    password: str
+    password: Optional[str] = None
     new_password: str
 
 
@@ -97,6 +103,8 @@ class AuthsTable:
         profile_image_url: str = "/user.png",
         role: str = "pending",
         oauth: Optional[dict] = None,
+        password_change_required: bool = False,
+        password_login_enabled: bool = True,
         db: Optional[Session] = None,
     ) -> Optional[UserModel]:
         with get_db_context(db) as db:
@@ -105,7 +113,14 @@ class AuthsTable:
             id = str(uuid.uuid4())
 
             auth = AuthModel(
-                **{"id": id, "email": email, "password": password, "active": True}
+                **{
+                    "id": id,
+                    "email": email,
+                    "password": password,
+                    "active": True,
+                    "password_change_required": password_change_required,
+                    "password_login_enabled": password_login_enabled,
+                }
             )
             result = Auth(**auth.model_dump())
             db.add(result)
@@ -179,17 +194,35 @@ class AuthsTable:
             return None
 
     def update_user_password_by_id(
-        self, id: str, new_password: str, db: Optional[Session] = None
+        self,
+        id: str,
+        new_password: str,
+        *,
+        password_change_required: bool = False,
+        password_login_enabled: bool = True,
+        db: Optional[Session] = None,
     ) -> bool:
         try:
             with get_db_context(db) as db:
-                result = (
-                    db.query(Auth).filter_by(id=id).update({"password": new_password})
+                result = db.query(Auth).filter_by(id=id).update(
+                    {
+                        "password": new_password,
+                        "password_change_required": password_change_required,
+                        "password_login_enabled": password_login_enabled,
+                    }
                 )
                 db.commit()
                 return True if result == 1 else False
         except Exception:
             return False
+
+    def get_auth_by_id(self, id: str, db: Optional[Session] = None) -> Optional[AuthModel]:
+        try:
+            with get_db_context(db) as db:
+                auth = db.query(Auth).filter_by(id=id).first()
+                return AuthModel.model_validate(auth) if auth else None
+        except Exception:
+            return None
 
     def update_email_by_id(
         self, id: str, email: str, db: Optional[Session] = None

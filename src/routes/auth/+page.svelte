@@ -25,6 +25,7 @@
 	import Spinner from '$lib/components/common/Spinner.svelte';
 	import OnBoarding from '$lib/components/OnBoarding.svelte';
 	import SensitiveInput from '$lib/components/common/SensitiveInput.svelte';
+	import UpdatePassword from '$lib/components/chat/Settings/Account/UpdatePassword.svelte';
 
 	const i18n = getContext('i18n');
 
@@ -40,6 +41,8 @@
 	let confirmPassword = '';
 	let inviteCode = '';
 	let visibleOAuthProviders: string[] = [];
+	let requiresPasswordSetup = false;
+	let passwordSetupRedirectPath: string | null = null;
 
 	let ldapUsername = '';
 
@@ -61,10 +64,11 @@
 		guestNotificationDescription = description;
 	};
 
+	const sessionNeedsPasswordSetup = (sessionUser) =>
+		Boolean(sessionUser && (sessionUser.password_change_required || sessionUser.has_password === false));
+
 	const setSessionUser = async (sessionUser, redirectPath: string | null = null) => {
 		if (sessionUser) {
-			console.log(sessionUser);
-			toast.success($i18n.t(`You're now logged in.`));
 			if (sessionUser.token) {
 				localStorage.token = sessionUser.token;
 			}
@@ -82,9 +86,35 @@
 				redirectPath = $page.url.searchParams.get('redirect') || '/';
 			}
 
+			if (sessionNeedsPasswordSetup(sessionUser)) {
+				requiresPasswordSetup = true;
+				passwordSetupRedirectPath = redirectPath;
+				toast.info($i18n.t('Set a password to finish signing in.'));
+				return;
+			}
+
+			requiresPasswordSetup = false;
+			passwordSetupRedirectPath = null;
+			toast.success($i18n.t(`You're now logged in.`));
 			goto(redirectPath);
 			localStorage.removeItem('redirectPath');
 		}
+	};
+
+	const completePasswordSetup = async () => {
+		const sessionUser = await getSessionUser(localStorage.token).catch((error) => {
+			toast.error(`${error}`);
+			return null;
+		});
+
+		if (!sessionUser) {
+			return;
+		}
+
+		await setSessionUser(
+			sessionUser,
+			passwordSetupRedirectPath || localStorage.getItem('redirectPath') || null
+		);
 	};
 
 	const signInHandler = async () => {
@@ -236,7 +266,12 @@
 	onMount(async () => {
 		const redirectPath = $page.url.searchParams.get('redirect');
 		if ($user !== undefined) {
-			goto(redirectPath || '/');
+			if (sessionNeedsPasswordSetup($user)) {
+				requiresPasswordSetup = true;
+				passwordSetupRedirectPath = redirectPath || localStorage.getItem('redirectPath') || '/';
+			} else {
+				goto(redirectPath || '/');
+			}
 		} else {
 			if (redirectPath) {
 				localStorage.setItem('redirectPath', redirectPath);
@@ -315,209 +350,230 @@
 									/>
 								</div>
 							{/if}
-							<form
-								class=" flex flex-col justify-center"
-								on:submit={(e) => {
-									e.preventDefault();
-									submitHandler();
-								}}
-							>
-								{#if showGuestNotification}
-									<div
-										class="mb-4 w-full rounded-2xl border border-gray-200/80 dark:border-gray-800/90 bg-gray-50/80 dark:bg-gray-900/70 p-4 sm:p-5 text-left shadow-sm"
-									>
-										<div class="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">
-											{guestNotificationTitle}
-										</div>
-										{#if guestNotificationDescription}
-											<div class="mt-2 text-sm leading-relaxed text-gray-700 dark:text-gray-300 marked">
-												{@html DOMPurify.sanitize(marked(guestNotificationDescription))}
-											</div>
-										{/if}
+							{#if requiresPasswordSetup}
+								<div class="flex flex-col justify-center text-left rounded-2xl border border-gray-200/80 dark:border-gray-800/90 bg-gray-50/80 dark:bg-gray-900/70 p-5 shadow-sm">
+									<div class="text-2xl font-medium text-center">
+										{$i18n.t('Set Your Password')}
 									</div>
-								{/if}
-
-								<div class="mb-1">
-									<div class=" text-2xl font-medium">
-										{#if $config?.onboarding ?? false}
-											{$i18n.t(`Get started with {{WEBUI_NAME}}`, { WEBUI_NAME: $WEBUI_NAME })}
-										{:else if mode === 'ldap'}
-											{$i18n.t(`Sign in to {{WEBUI_NAME}} with LDAP`, { WEBUI_NAME: $WEBUI_NAME })}
-										{:else if mode === 'signin'}
-											{$i18n.t(`Sign in to {{WEBUI_NAME}}`, { WEBUI_NAME: $WEBUI_NAME })}
-										{:else}
-											{$i18n.t(`Sign up to {{WEBUI_NAME}}`, { WEBUI_NAME: $WEBUI_NAME })}
-										{/if}
+									<div class="mt-2 text-sm text-center text-gray-600 dark:text-gray-400">
+										{$i18n.t('Finish signing in by choosing a password for {{email}}.', {
+											email: $user?.email ?? email
+										})}
 									</div>
-
-									{#if $config?.onboarding ?? false}
-										<div class="mt-1 text-xs font-medium text-gray-600 dark:text-gray-500">
-											i {$WEBUI_NAME}
-											{$i18n.t(
-												'does not make any external connections, and your data stays securely on your locally hosted server.'
-											)}
-										</div>
-									{/if}
+									<div class="mt-5">
+										<UpdatePassword
+											showByDefault={true}
+											forceSetup={true}
+											hideToggle={true}
+											description={$i18n.t('You will be taken back to the app as soon as your new password is saved.')}
+											onSuccess={completePasswordSetup}
+										/>
+									</div>
 								</div>
-
-								{#if $config?.features.enable_login_form || $config?.features.enable_ldap || form}
-									<div class="flex flex-col mt-4">
-										{#if mode === 'signup'}
-											<div class="mb-2">
-												<label for="name" class="text-sm font-medium text-left mb-1 block"
-													>{$i18n.t('Name')}</label
-												>
-												<input
-													bind:value={name}
-													type="text"
-													id="name"
-													class="my-0.5 w-full text-sm outline-hidden bg-transparent placeholder:text-gray-300 dark:placeholder:text-gray-600"
-													autocomplete="name"
-													placeholder={$i18n.t('Enter Your Full Name')}
-													required
-												/>
+							{:else}
+								<form
+									class=" flex flex-col justify-center"
+									on:submit={(e) => {
+										e.preventDefault();
+										submitHandler();
+									}}
+								>
+									{#if showGuestNotification}
+										<div
+											class="mb-4 w-full rounded-2xl border border-gray-200/80 dark:border-gray-800/90 bg-gray-50/80 dark:bg-gray-900/70 p-4 sm:p-5 text-left shadow-sm"
+										>
+											<div class="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">
+												{guestNotificationTitle}
 											</div>
-										{/if}
-
-										{#if mode === 'ldap'}
-											<div class="mb-2">
-												<label for="username" class="text-sm font-medium text-left mb-1 block"
-													>{$i18n.t('Username')}</label
-												>
-												<input
-													bind:value={ldapUsername}
-													type="text"
-													class="my-0.5 w-full text-sm outline-hidden bg-transparent placeholder:text-gray-300 dark:placeholder:text-gray-600"
-													autocomplete="username"
-													name="username"
-													id="username"
-													placeholder={$i18n.t('Enter Your Username')}
-													required
-												/>
-											</div>
-										{:else}
-											<div class="mb-2">
-												<label for="email" class="text-sm font-medium text-left mb-1 block"
-													>{$i18n.t('Email')}</label
-												>
-												<input
-													bind:value={email}
-													type="email"
-													id="email"
-													class="my-0.5 w-full text-sm outline-hidden bg-transparent placeholder:text-gray-300 dark:placeholder:text-gray-600"
-													autocomplete="email"
-													name="email"
-													placeholder={$i18n.t('Enter Your Email')}
-													required
-												/>
-											</div>
-										{/if}
-
-										<div>
-											<label for="password" class="text-sm font-medium text-left mb-1 block"
-												>{$i18n.t('Password')}</label
-											>
-											<SensitiveInput
-												bind:value={password}
-												type="password"
-												id="password"
-												class="my-0.5 w-full text-sm outline-hidden bg-transparent placeholder:text-gray-300 dark:placeholder:text-gray-600"
-												placeholder={$i18n.t('Enter Your Password')}
-												autocomplete={mode === 'signup' ? 'new-password' : 'current-password'}
-												name="password"
-												screenReader={true}
-												required
-												aria-required="true"
-											/>
-										</div>
-
-										{#if mode === 'signup' && $config?.features?.enable_signup_password_confirmation}
-											<div class="mt-2">
-												<label
-													for="confirm-password"
-													class="text-sm font-medium text-left mb-1 block"
-													>{$i18n.t('Confirm Password')}</label
-												>
-												<SensitiveInput
-													bind:value={confirmPassword}
-													type="password"
-													id="confirm-password"
-													class="my-0.5 w-full text-sm outline-hidden bg-transparent"
-													placeholder={$i18n.t('Confirm Your Password')}
-													autocomplete="new-password"
-													name="confirm-password"
-													required
-												/>
-											</div>
-										{/if}
-
-										{#if mode === 'signup' && $config?.features?.enable_invite_only_auth}
-											<div class="mt-2">
-												<label for="invite-code" class="text-sm font-medium text-left mb-1 block"
-													>{$i18n.t('Invite Code')}</label
-												>
-												<input
-													bind:value={inviteCode}
-													type="text"
-													id="invite-code"
-													class="my-0.5 w-full text-sm outline-hidden bg-transparent placeholder:text-gray-300 dark:placeholder:text-gray-600"
-													placeholder={$i18n.t('Enter your invite code')}
-													required
-												/>
-											</div>
-										{/if}
-									</div>
-								{/if}
-								<div class="mt-5">
-									{#if $config?.features.enable_login_form || $config?.features.enable_ldap || form}
-										{#if mode === 'ldap'}
-											<button
-												class="bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
-												type="submit"
-											>
-												{$i18n.t('Authenticate')}
-											</button>
-										{:else}
-											<button
-												class="bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
-												type="submit"
-											>
-												{mode === 'signin'
-													? $i18n.t('Sign in')
-													: ($config?.onboarding ?? false)
-														? $i18n.t('Create Admin Account')
-														: $i18n.t('Create Account')}
-											</button>
-
-											{#if $config?.features.enable_signup &&
-												($config?.features.enable_password_signup ?? true) &&
-												!($config?.onboarding ?? false)}
-												<div class=" mt-4 text-sm text-center">
-													{mode === 'signin'
-														? $i18n.t("Don't have an account?")
-														: $i18n.t('Already have an account?')}
-
-													<button
-														class=" font-medium underline"
-														type="button"
-														on:click={() => {
-															if (mode === 'signin') {
-																mode = 'signup';
-															} else {
-																mode = 'signin';
-															}
-														}}
-													>
-														{mode === 'signin' ? $i18n.t('Sign up') : $i18n.t('Sign in')}
-													</button>
+											{#if guestNotificationDescription}
+												<div class="mt-2 text-sm leading-relaxed text-gray-700 dark:text-gray-300 marked">
+													{@html DOMPurify.sanitize(marked(guestNotificationDescription))}
 												</div>
 											{/if}
-										{/if}
+										</div>
 									{/if}
-								</div>
-							</form>
 
-							{#if ($config?.features?.enable_oauth_login ?? true) && visibleOAuthProviders.length > 0}
+									<div class="mb-1">
+										<div class=" text-2xl font-medium">
+											{#if $config?.onboarding ?? false}
+												{$i18n.t(`Get started with {{WEBUI_NAME}}`, { WEBUI_NAME: $WEBUI_NAME })}
+											{:else if mode === 'ldap'}
+												{$i18n.t(`Sign in to {{WEBUI_NAME}} with LDAP`, { WEBUI_NAME: $WEBUI_NAME })}
+											{:else if mode === 'signin'}
+												{$i18n.t(`Sign in to {{WEBUI_NAME}}`, { WEBUI_NAME: $WEBUI_NAME })}
+											{:else}
+												{$i18n.t(`Sign up to {{WEBUI_NAME}}`, { WEBUI_NAME: $WEBUI_NAME })}
+											{/if}
+										</div>
+
+										{#if $config?.onboarding ?? false}
+											<div class="mt-1 text-xs font-medium text-gray-600 dark:text-gray-500">
+												i {$WEBUI_NAME}
+												{$i18n.t(
+													'does not make any external connections, and your data stays securely on your locally hosted server.'
+												)}
+											</div>
+										{/if}
+									</div>
+
+									{#if $config?.features.enable_login_form || $config?.features.enable_ldap || form}
+										<div class="flex flex-col mt-4">
+											{#if mode === 'signup'}
+												<div class="mb-2">
+													<label for="name" class="text-sm font-medium text-left mb-1 block"
+														>{$i18n.t('Name')}</label
+													>
+													<input
+														bind:value={name}
+														type="text"
+														id="name"
+														class="my-0.5 w-full text-sm outline-hidden bg-transparent placeholder:text-gray-300 dark:placeholder:text-gray-600"
+														autocomplete="name"
+														placeholder={$i18n.t('Enter Your Full Name')}
+														required
+													/>
+												</div>
+											{/if}
+
+											{#if mode === 'ldap'}
+												<div class="mb-2">
+													<label for="username" class="text-sm font-medium text-left mb-1 block"
+														>{$i18n.t('Username')}</label
+													>
+													<input
+														bind:value={ldapUsername}
+														type="text"
+														class="my-0.5 w-full text-sm outline-hidden bg-transparent placeholder:text-gray-300 dark:placeholder:text-gray-600"
+														autocomplete="username"
+														name="username"
+														id="username"
+														placeholder={$i18n.t('Enter Your Username')}
+														required
+													/>
+												</div>
+											{:else}
+												<div class="mb-2">
+													<label for="email" class="text-sm font-medium text-left mb-1 block"
+														>{$i18n.t('Email')}</label
+													>
+													<input
+														bind:value={email}
+														type="email"
+														id="email"
+														class="my-0.5 w-full text-sm outline-hidden bg-transparent placeholder:text-gray-300 dark:placeholder:text-gray-600"
+														autocomplete="email"
+														name="email"
+														placeholder={$i18n.t('Enter Your Email')}
+														required
+													/>
+												</div>
+											{/if}
+
+											<div>
+												<label for="password" class="text-sm font-medium text-left mb-1 block"
+													>{$i18n.t('Password')}</label
+												>
+												<SensitiveInput
+													bind:value={password}
+													type="password"
+													id="password"
+													class="my-0.5 w-full text-sm outline-hidden bg-transparent placeholder:text-gray-300 dark:placeholder:text-gray-600"
+													placeholder={$i18n.t('Enter Your Password')}
+													autocomplete={mode === 'signup' ? 'new-password' : 'current-password'}
+													name="password"
+													screenReader={true}
+													required
+													aria-required="true"
+												/>
+											</div>
+
+											{#if mode === 'signup' && $config?.features?.enable_signup_password_confirmation}
+												<div class="mt-2">
+													<label
+														for="confirm-password"
+														class="text-sm font-medium text-left mb-1 block"
+														>{$i18n.t('Confirm Password')}</label
+													>
+													<SensitiveInput
+														bind:value={confirmPassword}
+														type="password"
+														id="confirm-password"
+														class="my-0.5 w-full text-sm outline-hidden bg-transparent"
+														placeholder={$i18n.t('Confirm Your Password')}
+														autocomplete="new-password"
+														name="confirm-password"
+														required
+													/>
+												</div>
+											{/if}
+
+											{#if mode === 'signup' && $config?.features?.enable_invite_only_auth}
+												<div class="mt-2">
+													<label for="invite-code" class="text-sm font-medium text-left mb-1 block"
+														>{$i18n.t('Invite Code')}</label
+													>
+													<input
+														bind:value={inviteCode}
+														type="text"
+														id="invite-code"
+														class="my-0.5 w-full text-sm outline-hidden bg-transparent placeholder:text-gray-300 dark:placeholder:text-gray-600"
+														placeholder={$i18n.t('Enter your invite code')}
+														required
+													/>
+												</div>
+											{/if}
+										</div>
+									{/if}
+									<div class="mt-5">
+										{#if $config?.features.enable_login_form || $config?.features.enable_ldap || form}
+											{#if mode === 'ldap'}
+												<button
+													class="bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
+													type="submit"
+												>
+													{$i18n.t('Authenticate')}
+												</button>
+											{:else}
+												<button
+													class="bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
+													type="submit"
+												>
+													{mode === 'signin'
+														? $i18n.t('Sign in')
+														: ($config?.onboarding ?? false)
+															? $i18n.t('Create Admin Account')
+															: $i18n.t('Create Account')}
+												</button>
+
+												{#if $config?.features.enable_signup &&
+													($config?.features.enable_password_signup ?? true) &&
+													!($config?.onboarding ?? false)}
+													<div class=" mt-4 text-sm text-center">
+														{mode === 'signin'
+															? $i18n.t("Don't have an account?")
+															: $i18n.t('Already have an account?')}
+
+														<button
+															class=" font-medium underline"
+															type="button"
+															on:click={() => {
+																if (mode === 'signin') {
+																	mode = 'signup';
+																} else {
+																	mode = 'signin';
+																}
+															}}
+														>
+															{mode === 'signin' ? $i18n.t('Sign up') : $i18n.t('Sign in')}
+														</button>
+													</div>
+												{/if}
+											{/if}
+										{/if}
+									</div>
+								</form>
+
+								{#if ($config?.features?.enable_oauth_login ?? true) && visibleOAuthProviders.length > 0}
 								<div class="inline-flex items-center justify-center w-full">
 									<hr class="w-32 h-px my-4 border-0 dark:bg-gray-100/10 bg-gray-700/10" />
 									{#if $config?.features.enable_login_form || $config?.features.enable_ldap || form}
@@ -720,24 +776,25 @@
 								</div>
 							{/if}
 
-							{#if $config?.features.enable_ldap && $config?.features.enable_login_form}
-								<div class="mt-2">
-									<button
-										class="flex justify-center items-center text-xs w-full text-center underline"
-										type="button"
-										on:click={() => {
-											if (mode === 'ldap')
-												mode = ($config?.onboarding ?? false) ? 'signup' : 'signin';
-											else mode = 'ldap';
-										}}
-									>
-										<span
-											>{mode === 'ldap'
-												? $i18n.t('Continue with Email')
-												: $i18n.t('Continue with LDAP')}</span
+								{#if $config?.features.enable_ldap && $config?.features.enable_login_form}
+									<div class="mt-2">
+										<button
+											class="flex justify-center items-center text-xs w-full text-center underline"
+											type="button"
+											on:click={() => {
+												if (mode === 'ldap')
+													mode = ($config?.onboarding ?? false) ? 'signup' : 'signin';
+												else mode = 'ldap';
+											}}
 										>
-									</button>
-								</div>
+											<span
+												>{mode === 'ldap'
+													? $i18n.t('Continue with Email')
+													: $i18n.t('Continue with LDAP')}</span
+											>
+										</button>
+									</div>
+								{/if}
 							{/if}
 						</div>
 						{#if $config?.metadata?.login_footer}

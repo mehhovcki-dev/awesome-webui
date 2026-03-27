@@ -662,6 +662,27 @@ class UsersTable:
         except Exception:
             return None
 
+    def delete_user_oauth_by_id(
+        self, id: str, provider: str, db: Optional[Session] = None
+    ) -> Optional[UserModel]:
+        try:
+            with get_db_context(db) as db:
+                user = db.query(User).filter_by(id=id).first()
+                if not user:
+                    return None
+
+                oauth = dict(user.oauth or {})
+                if provider not in oauth:
+                    return UserModel.model_validate(user)
+
+                oauth.pop(provider, None)
+                user.oauth = oauth or None
+                db.commit()
+                db.refresh(user)
+                return UserModel.model_validate(user)
+        except Exception:
+            return None
+
     def update_user_scim_by_id(
         self,
         id: str,

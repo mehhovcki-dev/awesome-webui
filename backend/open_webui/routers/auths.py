@@ -406,6 +406,9 @@ def create_session_response(
     user_permissions = get_permissions(
         user.id, request.app.state.config.USER_PERMISSIONS, db=db
     )
+    auth = Auths.get_auth_by_id(user.id, db=db)
+    has_password = auth.password_login_enabled if auth else True
+    password_change_required = auth.password_change_required if auth else False
 
     return {
         "token": token,
@@ -420,6 +423,8 @@ def create_session_response(
         "status_emoji": user.status_emoji,
         "status_message": user.status_message,
         "status_expires_at": user.status_expires_at,
+        "has_password": has_password,
+        "password_change_required": password_change_required,
         "permissions": user_permissions,
     }
 
@@ -436,6 +441,8 @@ class SessionUserResponse(Token, UserProfileImageResponse):
     status_emoji: Optional[str] = None
     status_message: Optional[str] = None
     status_expires_at: Optional[int] = None
+    has_password: bool = True
+    password_change_required: bool = False
 
 
 class SessionUserInfoResponse(SessionUserResponse, UserStatus):
@@ -486,6 +493,9 @@ async def get_session_user(
     user_permissions = get_permissions(
         user.id, request.app.state.config.USER_PERMISSIONS, db=db
     )
+    auth = Auths.get_auth_by_id(user.id, db=db)
+    has_password = auth.password_login_enabled if auth else True
+    password_change_required = auth.password_change_required if auth else False
 
     return {
         "token": token,
@@ -504,6 +514,8 @@ async def get_session_user(
         "status_emoji": user.status_emoji,
         "status_message": user.status_message,
         "status_expires_at": user.status_expires_at,
+        "has_password": has_password,
+        "password_change_required": password_change_required,
         "permissions": user_permissions,
     }
 
@@ -573,19 +585,36 @@ async def update_password(
     if WEBUI_AUTH_TRUSTED_EMAIL_HEADER:
         raise HTTPException(400, detail=ERROR_MESSAGES.ACTION_PROHIBITED)
     if session_user:
-        user = Auths.authenticate_user(
-            session_user.email,
-            lambda pw: verify_password(form_data.password, pw),
-            db=db,
-        )
+        auth = Auths.get_auth_by_id(session_user.id, db=db)
+        if not auth:
+            raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
+
+        if auth.password_change_required or not auth.password_login_enabled:
+            user = session_user
+        else:
+            if not form_data.password:
+                raise HTTPException(400, detail=ERROR_MESSAGES.INCORRECT_PASSWORD)
+
+            user = Auths.authenticate_user(
+                session_user.email,
+                lambda pw: verify_password(form_data.password, pw),
+                db=db,
+            )
 
         if user:
             try:
-                validate_password(form_data.password)
+                validate_password(form_data.new_password)
             except Exception as e:
                 raise HTTPException(400, detail=str(e))
+
             hashed = get_password_hash(form_data.new_password)
-            return Auths.update_user_password_by_id(user.id, hashed, db=db)
+            return Auths.update_user_password_by_id(
+                user.id,
+                hashed,
+                password_change_required=False,
+                password_login_enabled=True,
+                db=db,
+            )
         else:
             raise HTTPException(400, detail=ERROR_MESSAGES.INCORRECT_PASSWORD)
     else:
