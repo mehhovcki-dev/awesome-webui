@@ -17,7 +17,7 @@ log = logging.getLogger(__name__)
 
 
 class Auth(Base):
-    __tablename__ = "auth"
+    __tablename__ = 'auth'
 
     id = Column(String, primary_key=True, unique=True)
     email = Column(String)
@@ -79,10 +79,10 @@ class SignupForm(BaseModel):
     name: str
     email: str
     password: str
-    profile_image_url: Optional[str] = "/user.png"
+    profile_image_url: Optional[str] = '/user.png'
     invite_code: Optional[str] = None
 
-    @field_validator("profile_image_url")
+    @field_validator('profile_image_url')
     @classmethod
     def check_profile_image_url(cls, v: Optional[str]) -> Optional[str]:
         if v is not None:
@@ -91,7 +91,7 @@ class SignupForm(BaseModel):
 
 
 class AddUserForm(SignupForm):
-    role: Optional[str] = "pending"
+    role: Optional[str] = 'pending'
 
 
 class AuthsTable:
@@ -100,34 +100,32 @@ class AuthsTable:
         email: str,
         password: str,
         name: str,
-        profile_image_url: str = "/user.png",
-        role: str = "pending",
+        profile_image_url: str = '/user.png',
+        role: str = 'pending',
         oauth: Optional[dict] = None,
         password_change_required: bool = False,
         password_login_enabled: bool = True,
         db: Optional[Session] = None,
     ) -> Optional[UserModel]:
         with get_db_context(db) as db:
-            log.info("insert_new_auth")
+            log.info('insert_new_auth')
 
             id = str(uuid.uuid4())
 
             auth = AuthModel(
                 **{
-                    "id": id,
-                    "email": email,
-                    "password": password,
-                    "active": True,
-                    "password_change_required": password_change_required,
-                    "password_login_enabled": password_login_enabled,
+                    'id': id,
+                    'email': email,
+                    'password': password,
+                    'active': True,
+                    'password_change_required': password_change_required,
+                    'password_login_enabled': password_login_enabled,
                 }
             )
             result = Auth(**auth.model_dump())
             db.add(result)
 
-            user = Users.insert_new_user(
-                id, name, email, profile_image_url, role, oauth=oauth, db=db
-            )
+            user = Users.insert_new_user(id, name, email, profile_image_url, role, oauth=oauth, db=db)
 
             db.commit()
             db.refresh(result)
@@ -140,7 +138,7 @@ class AuthsTable:
     def authenticate_user(
         self, email: str, verify_password: callable, db: Optional[Session] = None
     ) -> Optional[UserModel]:
-        log.info(f"authenticate_user: {email}")
+        log.info(f'authenticate_user: {email}')
 
         user = Users.get_user_by_email(email, db=db)
         if not user:
@@ -159,10 +157,8 @@ class AuthsTable:
         except Exception:
             return None
 
-    def authenticate_user_by_api_key(
-        self, api_key: str, db: Optional[Session] = None
-    ) -> Optional[UserModel]:
-        log.info(f"authenticate_user_by_api_key")
+    def authenticate_user_by_api_key(self, api_key: str, db: Optional[Session] = None) -> Optional[UserModel]:
+        log.info(f'authenticate_user_by_api_key')
         # if no api_key, return None
         if not api_key:
             return None
@@ -173,10 +169,8 @@ class AuthsTable:
         except Exception:
             return False
 
-    def authenticate_user_by_email(
-        self, email: str, db: Optional[Session] = None
-    ) -> Optional[UserModel]:
-        log.info(f"authenticate_user_by_email: {email}")
+    def authenticate_user_by_email(self, email: str, db: Optional[Session] = None) -> Optional[UserModel]:
+        log.info(f'authenticate_user_by_email: {email}')
         try:
             with get_db_context(db) as db:
                 # Single JOIN query instead of two separate queries
@@ -204,12 +198,16 @@ class AuthsTable:
     ) -> bool:
         try:
             with get_db_context(db) as db:
-                result = db.query(Auth).filter_by(id=id).update(
-                    {
-                        "password": new_password,
-                        "password_change_required": password_change_required,
-                        "password_login_enabled": password_login_enabled,
-                    }
+                result = (
+                    db.query(Auth)
+                    .filter_by(id=id)
+                    .update(
+                        {
+                            'password': new_password,
+                            'password_change_required': password_change_required,
+                            'password_login_enabled': password_login_enabled,
+                        }
+                    )
                 )
                 db.commit()
                 return True if result == 1 else False
@@ -224,15 +222,13 @@ class AuthsTable:
         except Exception:
             return None
 
-    def update_email_by_id(
-        self, id: str, email: str, db: Optional[Session] = None
-    ) -> bool:
+    def update_email_by_id(self, id: str, email: str, db: Optional[Session] = None) -> bool:
         try:
             with get_db_context(db) as db:
-                result = db.query(Auth).filter_by(id=id).update({"email": email})
+                result = db.query(Auth).filter_by(id=id).update({'email': email})
                 db.commit()
                 if result == 1:
-                    Users.update_user_by_id(id, {"email": email}, db=db)
+                    Users.update_user_by_id(id, {'email': email}, db=db)
                     return True
                 return False
         except Exception:

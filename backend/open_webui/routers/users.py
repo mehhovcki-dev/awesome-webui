@@ -48,7 +48,7 @@ router = APIRouter()
 
 
 def _generate_temporary_password() -> str:
-    return f"awesomewebui{secrets.randbelow(100_000_000):08d}"
+    return f'awesomewebui{secrets.randbelow(100_000_000):08d}'
 
 
 class PasswordResetResponse(BaseModel):
@@ -68,7 +68,7 @@ class UserOAuthResponse(BaseModel):
 PAGE_ITEM_COUNT = 30
 
 
-@router.get("/", response_model=UserGroupIdsListResponse)
+@router.get('/', response_model=UserGroupIdsListResponse)
 async def get_users(
     query: Optional[str] = None,
     order_by: Optional[str] = None,
@@ -84,38 +84,38 @@ async def get_users(
 
     filter = {}
     if query:
-        filter["query"] = query
+        filter['query'] = query
     if order_by:
-        filter["order_by"] = order_by
+        filter['order_by'] = order_by
     if direction:
-        filter["direction"] = direction
+        filter['direction'] = direction
 
-    filter["direction"] = direction
+    filter['direction'] = direction
 
     result = Users.get_users(filter=filter, skip=skip, limit=limit, db=db)
 
-    users = result["users"]
-    total = result["total"]
+    users = result['users']
+    total = result['total']
 
     # Fetch groups for all users in a single query to avoid N+1
     user_ids = [user.id for user in users]
     user_groups = Groups.get_groups_by_member_ids(user_ids, db=db)
 
     return {
-        "users": [
+        'users': [
             UserGroupIdsModel(
                 **{
                     **user.model_dump(),
-                    "group_ids": [group.id for group in user_groups.get(user.id, [])],
+                    'group_ids': [group.id for group in user_groups.get(user.id, [])],
                 }
             )
             for user in users
         ],
-        "total": total,
+        'total': total,
     }
 
 
-@router.get("/all", response_model=UserInfoListResponse)
+@router.get('/all', response_model=UserInfoListResponse)
 async def get_all_users(
     user=Depends(get_admin_user),
     db: Session = Depends(get_session),
@@ -123,7 +123,7 @@ async def get_all_users(
     return Users.get_users(db=db)
 
 
-@router.get("/search", response_model=UserInfoListResponse)
+@router.get('/search', response_model=UserInfoListResponse)
 async def search_users(
     query: Optional[str] = None,
     order_by: Optional[str] = None,
@@ -139,11 +139,11 @@ async def search_users(
 
     filter = {}
     if query:
-        filter["query"] = query
+        filter['query'] = query
     if order_by:
-        filter["order_by"] = order_by
+        filter['order_by'] = order_by
     if direction:
-        filter["direction"] = direction
+        filter['direction'] = direction
 
     return Users.get_users(filter=filter, skip=skip, limit=limit, db=db)
 
@@ -153,10 +153,8 @@ async def search_users(
 ############################
 
 
-@router.get("/groups")
-async def get_user_groups(
-    user=Depends(get_verified_user), db: Session = Depends(get_session)
-):
+@router.get('/groups')
+async def get_user_groups(user=Depends(get_verified_user), db: Session = Depends(get_session)):
     return Groups.get_groups_by_member_id(user.id, db=db)
 
 
@@ -165,15 +163,13 @@ async def get_user_groups(
 ############################
 
 
-@router.get("/permissions")
+@router.get('/permissions')
 async def get_user_permissisions(
     request: Request,
     user=Depends(get_verified_user),
     db: Session = Depends(get_session),
 ):
-    user_permissions = get_permissions(
-        user.id, request.app.state.config.USER_PERMISSIONS, db=db
-    )
+    user_permissions = get_permissions(user.id, request.app.state.config.USER_PERMISSIONS, db=db)
 
     return user_permissions
 
@@ -263,34 +259,20 @@ class UserPermissions(BaseModel):
     settings: SettingsPermissions
 
 
-@router.get("/default/permissions", response_model=UserPermissions)
+@router.get('/default/permissions', response_model=UserPermissions)
 async def get_default_user_permissions(request: Request, user=Depends(get_admin_user)):
     return {
-        "workspace": WorkspacePermissions(
-            **request.app.state.config.USER_PERMISSIONS.get("workspace", {})
-        ),
-        "sharing": SharingPermissions(
-            **request.app.state.config.USER_PERMISSIONS.get("sharing", {})
-        ),
-        "access_grants": AccessGrantsPermissions(
-            **request.app.state.config.USER_PERMISSIONS.get("access_grants", {})
-        ),
-        "chat": ChatPermissions(
-            **request.app.state.config.USER_PERMISSIONS.get("chat", {})
-        ),
-        "features": FeaturesPermissions(
-            **request.app.state.config.USER_PERMISSIONS.get("features", {})
-        ),
-        "settings": SettingsPermissions(
-            **request.app.state.config.USER_PERMISSIONS.get("settings", {})
-        ),
+        'workspace': WorkspacePermissions(**request.app.state.config.USER_PERMISSIONS.get('workspace', {})),
+        'sharing': SharingPermissions(**request.app.state.config.USER_PERMISSIONS.get('sharing', {})),
+        'access_grants': AccessGrantsPermissions(**request.app.state.config.USER_PERMISSIONS.get('access_grants', {})),
+        'chat': ChatPermissions(**request.app.state.config.USER_PERMISSIONS.get('chat', {})),
+        'features': FeaturesPermissions(**request.app.state.config.USER_PERMISSIONS.get('features', {})),
+        'settings': SettingsPermissions(**request.app.state.config.USER_PERMISSIONS.get('settings', {})),
     }
 
 
-@router.post("/default/permissions")
-async def update_default_user_permissions(
-    request: Request, form_data: UserPermissions, user=Depends(get_admin_user)
-):
+@router.post('/default/permissions')
+async def update_default_user_permissions(request: Request, form_data: UserPermissions, user=Depends(get_admin_user)):
     request.app.state.config.USER_PERMISSIONS = form_data.model_dump()
     return request.app.state.config.USER_PERMISSIONS
 
@@ -300,10 +282,8 @@ async def update_default_user_permissions(
 ############################
 
 
-@router.get("/user/settings", response_model=Optional[UserSettings])
-async def get_user_settings_by_session_user(
-    user=Depends(get_verified_user), db: Session = Depends(get_session)
-):
+@router.get('/user/settings', response_model=Optional[UserSettings])
+async def get_user_settings_by_session_user(user=Depends(get_verified_user), db: Session = Depends(get_session)):
     user = Users.get_user_by_id(user.id, db=db)
     if user:
         return user.settings
@@ -319,7 +299,7 @@ async def get_user_settings_by_session_user(
 ############################
 
 
-@router.post("/user/settings/update", response_model=UserSettings)
+@router.post('/user/settings/update', response_model=UserSettings)
 async def update_user_settings_by_session_user(
     request: Request,
     form_data: UserSettings,
@@ -327,19 +307,19 @@ async def update_user_settings_by_session_user(
     db: Session = Depends(get_session),
 ):
     updated_user_settings = form_data.model_dump()
-    ui_settings = updated_user_settings.get("ui")
+    ui_settings = updated_user_settings.get('ui')
     if (
-        user.role != "admin"
+        user.role != 'admin'
         and ui_settings is not None
-        and "toolServers" in ui_settings.keys()
+        and 'toolServers' in ui_settings.keys()
         and not has_permission(
             user.id,
-            "features.direct_tool_servers",
+            'features.direct_tool_servers',
             request.app.state.config.USER_PERMISSIONS,
         )
     ):
         # If the user is not an admin and does not have permission to use tool servers, remove the key
-        updated_user_settings["ui"].pop("toolServers", None)
+        updated_user_settings['ui'].pop('toolServers', None)
 
     user = Users.update_user_settings_by_id(user.id, updated_user_settings, db=db)
     if user:
@@ -356,7 +336,7 @@ async def update_user_settings_by_session_user(
 ############################
 
 
-@router.get("/user/status")
+@router.get('/user/status')
 async def get_user_status_by_session_user(
     request: Request,
     user=Depends(get_verified_user),
@@ -382,7 +362,7 @@ async def get_user_status_by_session_user(
 ############################
 
 
-@router.post("/user/status/update")
+@router.post('/user/status/update')
 async def update_user_status_by_session_user(
     request: Request,
     form_data: UserStatus,
@@ -406,13 +386,13 @@ async def update_user_status_by_session_user(
                 # Keep session cache in sync for all active sessions of this user.
                 for sid in list(SESSION_POOL.keys()):
                     entry = SESSION_POOL.get(sid)
-                    if entry and entry.get("id") == target_user.id:
+                    if entry and entry.get('id') == target_user.id:
                         SESSION_POOL[sid] = {
                             **entry,
-                            "presence_state": target_user.presence_state,
-                            "status_emoji": target_user.status_emoji,
-                            "status_message": target_user.status_message,
-                            "status_expires_at": target_user.status_expires_at,
+                            'presence_state': target_user.presence_state,
+                            'status_emoji': target_user.status_emoji,
+                            'status_message': target_user.status_message,
+                            'status_expires_at': target_user.status_expires_at,
                         }
 
                 # Build a viewer-role map from active sessions so admin/user visibility can differ.
@@ -421,39 +401,37 @@ async def update_user_status_by_session_user(
                     if not entry:
                         continue
 
-                    viewer_id = entry.get("id")
-                    viewer_role = entry.get("role", "user")
+                    viewer_id = entry.get('id')
+                    viewer_role = entry.get('role', 'user')
                     if viewer_id and viewer_id not in viewer_roles:
                         viewer_roles[viewer_id] = viewer_role
 
                 for viewer_id, viewer_role in viewer_roles.items():
                     await emit_to_users(
-                        "events",
+                        'events',
                         {
-                            "chat_id": None,
-                            "message_id": None,
-                            "data": {
-                                "type": "user:presence",
-                                "data": {
-                                    "id": target_user.id,
-                                    "presence_state": target_user.presence_state,
-                                    "status_emoji": target_user.status_emoji,
-                                    "status_message": target_user.status_message,
-                                    "status_expires_at": target_user.status_expires_at,
-                                    "is_active": Users.is_active_for_viewer(
-                                        target_user, viewer_role=viewer_role
-                                    ),
+                            'chat_id': None,
+                            'message_id': None,
+                            'data': {
+                                'type': 'user:presence',
+                                'data': {
+                                    'id': target_user.id,
+                                    'presence_state': target_user.presence_state,
+                                    'status_emoji': target_user.status_emoji,
+                                    'status_message': target_user.status_message,
+                                    'status_expires_at': target_user.status_expires_at,
+                                    'is_active': Users.is_active_for_viewer(target_user, viewer_role=viewer_role),
                                 },
                             },
-                            "user": {
-                                "id": target_user.id,
-                                "name": target_user.name,
+                            'user': {
+                                'id': target_user.id,
+                                'name': target_user.name,
                             },
                         },
                         [viewer_id],
                     )
             except Exception as e:
-                log.debug(f"Failed to emit realtime presence update: {e}")
+                log.debug(f'Failed to emit realtime presence update: {e}')
 
             return target_user
 
@@ -473,10 +451,8 @@ async def update_user_status_by_session_user(
 ############################
 
 
-@router.get("/user/info", response_model=Optional[dict])
-async def get_user_info_by_session_user(
-    user=Depends(get_verified_user), db: Session = Depends(get_session)
-):
+@router.get('/user/info', response_model=Optional[dict])
+async def get_user_info_by_session_user(user=Depends(get_verified_user), db: Session = Depends(get_session)):
     user = Users.get_user_by_id(user.id, db=db)
     if user:
         return user.info
@@ -492,7 +468,7 @@ async def get_user_info_by_session_user(
 ############################
 
 
-@router.post("/user/info/update", response_model=Optional[dict])
+@router.post('/user/info/update', response_model=Optional[dict])
 async def update_user_info_by_session_user(
     form_data: dict, user=Depends(get_verified_user), db: Session = Depends(get_session)
 ):
@@ -501,9 +477,7 @@ async def update_user_info_by_session_user(
         if user.info is None:
             user.info = {}
 
-        user = Users.update_user_by_id(
-            user.id, {"info": {**user.info, **form_data}}, db=db
-        )
+        user = Users.update_user_by_id(user.id, {'info': {**user.info, **form_data}}, db=db)
         if user:
             return user.info
         else:
@@ -529,17 +503,15 @@ class UserActiveResponse(UserStatus):
     groups: Optional[list] = []
 
     is_active: bool
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra='allow')
 
 
-@router.get("/{user_id}", response_model=UserActiveResponse)
-async def get_user_by_id(
-    user_id: str, session_user=Depends(get_admin_user), db: Session = Depends(get_session)
-):
+@router.get('/{user_id}', response_model=UserActiveResponse)
+async def get_user_by_id(user_id: str, session_user=Depends(get_admin_user), db: Session = Depends(get_session)):
     # Check if user_id is a shared chat
     # If it is, get the user_id from the chat
-    if user_id.startswith("shared-"):
-        chat_id = user_id.replace("shared-", "")
+    if user_id.startswith('shared-'):
+        chat_id = user_id.replace('shared-', '')
         chat = Chats.get_chat_by_id(chat_id)
         if chat:
             user_id = chat.user_id
@@ -555,10 +527,8 @@ async def get_user_by_id(
         return UserActiveResponse(
             **{
                 **target_user.model_dump(),
-                "groups": [{"id": group.id, "name": group.name} for group in groups],
-                "is_active": Users.is_active_for_viewer(
-                    target_user, viewer_role=session_user.role
-                ),
+                'groups': [{'id': group.id, 'name': group.name} for group in groups],
+                'is_active': Users.is_active_for_viewer(target_user, viewer_role=session_user.role),
             }
         )
     else:
@@ -568,7 +538,7 @@ async def get_user_by_id(
         )
 
 
-@router.get("/{user_id}/info", response_model=UserInfoResponse)
+@router.get('/{user_id}/info', response_model=UserInfoResponse)
 async def get_user_info_by_id(
     user_id: str,
     session_user=Depends(get_verified_user),
@@ -580,10 +550,8 @@ async def get_user_info_by_id(
         return UserInfoResponse(
             **{
                 **target_user.model_dump(),
-                "groups": [{"id": group.id, "name": group.name} for group in groups],
-                "is_active": Users.is_active_for_viewer(
-                    target_user, viewer_role=session_user.role
-                ),
+                'groups': [{'id': group.id, 'name': group.name} for group in groups],
+                'is_active': Users.is_active_for_viewer(target_user, viewer_role=session_user.role),
             }
         )
     else:
@@ -593,10 +561,8 @@ async def get_user_info_by_id(
         )
 
 
-@router.get("/{user_id}/oauth/sessions")
-async def get_user_oauth_sessions_by_id(
-    user_id: str, user=Depends(get_admin_user), db: Session = Depends(get_session)
-):
+@router.get('/{user_id}/oauth/sessions')
+async def get_user_oauth_sessions_by_id(user_id: str, user=Depends(get_admin_user), db: Session = Depends(get_session)):
     sessions = OAuthSessions.get_sessions_by_user_id(user_id, db=db)
     if sessions and len(sessions) > 0:
         return sessions
@@ -607,17 +573,17 @@ async def get_user_oauth_sessions_by_id(
         )
 
 
-@router.delete("/user/oauth/{provider}", response_model=UserOAuthResponse)
+@router.delete('/user/oauth/{provider}', response_model=UserOAuthResponse)
 async def unlink_user_oauth_provider(
     provider: str,
     user=Depends(get_verified_user),
     db: Session = Depends(get_session),
 ):
-    normalized_provider = str(provider or "").strip().lower()
+    normalized_provider = str(provider or '').strip().lower()
     if not normalized_provider:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=ERROR_MESSAGES.DEFAULT("OAuth provider is required."),
+            detail=ERROR_MESSAGES.DEFAULT('OAuth provider is required.'),
         )
 
     session_user = Users.get_user_by_id(user.id, db=db)
@@ -631,7 +597,7 @@ async def unlink_user_oauth_provider(
     if normalized_provider not in linked_oauth:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=ERROR_MESSAGES.DEFAULT("This SSO provider is not linked."),
+            detail=ERROR_MESSAGES.DEFAULT('This SSO provider is not linked.'),
         )
 
     auth = Auths.get_auth_by_id(user.id, db=db)
@@ -652,10 +618,10 @@ async def unlink_user_oauth_provider(
         if session.provider == normalized_provider:
             OAuthSessions.delete_session_by_id(session.id, db=db)
 
-    return {"oauth": updated_user.oauth}
+    return {'oauth': updated_user.oauth}
 
 
-@router.post("/{user_id}/password/reset", response_model=PasswordResetResponse)
+@router.post('/{user_id}/password/reset', response_model=PasswordResetResponse)
 async def reset_user_password_by_id(
     user_id: str,
     user=Depends(get_admin_user),
@@ -683,8 +649,8 @@ async def reset_user_password_by_id(
         )
 
     return {
-        "password": temporary_password,
-        "password_change_required": True,
+        'password': temporary_password,
+        'password_change_required': True,
     }
 
 
@@ -693,32 +659,32 @@ async def reset_user_password_by_id(
 ############################
 
 
-@router.get("/{user_id}/profile/image")
+@router.get('/{user_id}/profile/image')
 def get_user_profile_image_by_id(user_id: str, user=Depends(get_verified_user)):
     user = Users.get_user_by_id(user_id)
     if user:
         if user.profile_image_url:
             # check if it's url or base64
-            if user.profile_image_url.startswith("http"):
+            if user.profile_image_url.startswith('http'):
                 return Response(
                     status_code=status.HTTP_302_FOUND,
-                    headers={"Location": user.profile_image_url},
+                    headers={'Location': user.profile_image_url},
                 )
-            elif user.profile_image_url.startswith("data:image"):
+            elif user.profile_image_url.startswith('data:image'):
                 try:
-                    header, base64_data = user.profile_image_url.split(",", 1)
+                    header, base64_data = user.profile_image_url.split(',', 1)
                     image_data = base64.b64decode(base64_data)
                     image_buffer = io.BytesIO(image_data)
-                    media_type = header.split(";")[0].lstrip("data:")
+                    media_type = header.split(';')[0].lstrip('data:')
 
                     return StreamingResponse(
                         image_buffer,
                         media_type=media_type,
-                        headers={"Content-Disposition": "inline"},
+                        headers={'Content-Disposition': 'inline'},
                     )
                 except Exception as e:
                     pass
-        return FileResponse(f"{STATIC_DIR}/user.png")
+        return FileResponse(f'{STATIC_DIR}/user.png')
     else:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -731,7 +697,7 @@ def get_user_profile_image_by_id(user_id: str, user=Depends(get_verified_user)):
 ############################
 
 
-@router.get("/{user_id}/active", response_model=dict)
+@router.get('/{user_id}/active', response_model=dict)
 async def get_user_active_status_by_id(
     user_id: str,
     session_user=Depends(get_verified_user),
@@ -739,11 +705,7 @@ async def get_user_active_status_by_id(
 ):
     target_user = Users.get_user_by_id(user_id, db=db)
     return {
-        "active": Users.is_active_for_viewer(
-            target_user, viewer_role=session_user.role
-        )
-        if target_user
-        else False,
+        'active': Users.is_active_for_viewer(target_user, viewer_role=session_user.role) if target_user else False,
     }
 
 
@@ -752,7 +714,7 @@ async def get_user_active_status_by_id(
 ############################
 
 
-@router.post("/{user_id}/update", response_model=Optional[UserModel])
+@router.post('/{user_id}/update', response_model=Optional[UserModel])
 async def update_user_by_id(
     user_id: str,
     form_data: UserUpdateForm,
@@ -771,7 +733,7 @@ async def update_user_by_id(
                         detail=ERROR_MESSAGES.ACTION_PROHIBITED,
                     )
 
-                if form_data.role != "admin":
+                if form_data.role != 'admin':
                     # If the primary admin is trying to change their own role, prevent it
                     raise HTTPException(
                         status_code=status.HTTP_403_FORBIDDEN,
@@ -779,10 +741,10 @@ async def update_user_by_id(
                     )
 
     except Exception as e:
-        log.error(f"Error checking primary admin status: {e}")
+        log.error(f'Error checking primary admin status: {e}')
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not verify primary admin status.",
+            detail='Could not verify primary admin status.',
         )
 
     user = Users.get_user_by_id(user_id, db=db)
@@ -809,10 +771,10 @@ async def update_user_by_id(
         updated_user = Users.update_user_by_id(
             user_id,
             {
-                "role": form_data.role,
-                "name": form_data.name,
-                "email": form_data.email.lower(),
-                "profile_image_url": form_data.profile_image_url,
+                'role': form_data.role,
+                'name': form_data.name,
+                'email': form_data.email.lower(),
+                'profile_image_url': form_data.profile_image_url,
             },
             db=db,
         )
@@ -836,10 +798,8 @@ async def update_user_by_id(
 ############################
 
 
-@router.delete("/{user_id}", response_model=bool)
-async def delete_user_by_id(
-    user_id: str, user=Depends(get_admin_user), db: Session = Depends(get_session)
-):
+@router.delete('/{user_id}', response_model=bool)
+async def delete_user_by_id(user_id: str, user=Depends(get_admin_user), db: Session = Depends(get_session)):
     # Prevent deletion of the primary admin user
     try:
         first_user = Users.get_first_user(db=db)
@@ -849,10 +809,10 @@ async def delete_user_by_id(
                 detail=ERROR_MESSAGES.ACTION_PROHIBITED,
             )
     except Exception as e:
-        log.error(f"Error checking primary admin status: {e}")
+        log.error(f'Error checking primary admin status: {e}')
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Could not verify primary admin status.",
+            detail='Could not verify primary admin status.',
         )
 
     if user.id != user_id:
@@ -878,8 +838,6 @@ async def delete_user_by_id(
 ############################
 
 
-@router.get("/{user_id}/groups")
-async def get_user_groups_by_id(
-    user_id: str, user=Depends(get_admin_user), db: Session = Depends(get_session)
-):
+@router.get('/{user_id}/groups')
+async def get_user_groups_by_id(user_id: str, user=Depends(get_admin_user), db: Session = Depends(get_session)):
     return Groups.get_groups_by_member_id(user_id, db=db)

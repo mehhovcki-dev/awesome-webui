@@ -21,23 +21,23 @@ MODEL_HEALTH_HISTORY_DAYS = 90
 MODEL_HEALTH_RETENTION_SECONDS = MODEL_HEALTH_HISTORY_DAYS * 24 * 60 * 60
 MODEL_HEALTH_CHECK_TIMEOUT_SECONDS = 45
 MODEL_HEALTH_CHECK_CONCURRENCY = 4
-MODEL_HEALTH_PROMPT = "Reply with OK only."
+MODEL_HEALTH_PROMPT = 'Reply with OK only.'
 
 
 def build_internal_request(app) -> Request:
     return Request(
         {
-            "type": "http",
-            "asgi.version": "3.0",
-            "asgi.spec_version": "2.0",
-            "method": "GET",
-            "path": "/internal/model-health",
-            "query_string": b"",
-            "headers": Headers({}).raw,
-            "client": ("127.0.0.1", 12345),
-            "server": ("127.0.0.1", 80),
-            "scheme": "http",
-            "app": app,
+            'type': 'http',
+            'asgi.version': '3.0',
+            'asgi.spec_version': '2.0',
+            'method': 'GET',
+            'path': '/internal/model-health',
+            'query_string': b'',
+            'headers': Headers({}).raw,
+            'client': ('127.0.0.1', 12345),
+            'server': ('127.0.0.1', 80),
+            'scheme': 'http',
+            'app': app,
         }
     )
 
@@ -47,20 +47,20 @@ def get_model_health_user() -> Optional[UserModel]:
     if user is None:
         return None
 
-    return user.model_copy(update={"role": "admin"})
+    return user.model_copy(update={'role': 'admin'})
 
 
 def is_model_health_candidate(model: dict) -> bool:
     if not model:
         return False
 
-    if model.get("owned_by") == "arena":
+    if model.get('owned_by') == 'arena':
         return False
 
-    if model.get("pipeline", {}).get("type") == "filter":
+    if model.get('pipeline', {}).get('type') == 'filter':
         return False
 
-    return bool(model.get("id"))
+    return bool(model.get('id'))
 
 
 async def get_enabled_models_for_health(app, refresh: bool = False) -> list[dict]:
@@ -69,13 +69,11 @@ async def get_enabled_models_for_health(app, refresh: bool = False) -> list[dict
     models = await get_all_models(request, refresh=refresh, user=user)
 
     candidates = [model for model in models if is_model_health_candidate(model)]
-    candidates.sort(key=lambda model: (str(model.get("name") or model.get("id")).lower(), model.get("id")))
+    candidates.sort(key=lambda model: (str(model.get('name') or model.get('id')).lower(), model.get('id')))
     return candidates
 
 
-async def run_single_model_health_check(
-    app, user: UserModel, model: dict
-) -> ModelHealthCheckForm:
+async def run_single_model_health_check(app, user: UserModel, model: dict) -> ModelHealthCheckForm:
     request = build_internal_request(app)
 
     started_at = time.perf_counter()
@@ -85,11 +83,11 @@ async def run_single_model_health_check(
             generate_chat_completion(
                 request,
                 form_data={
-                    "model": model["id"],
-                    "messages": [{"role": "user", "content": MODEL_HEALTH_PROMPT}],
-                    "max_tokens": 8,
-                    "temperature": 0,
-                    "stream": False,
+                    'model': model['id'],
+                    'messages': [{'role': 'user', 'content': MODEL_HEALTH_PROMPT}],
+                    'max_tokens': 8,
+                    'temperature': 0,
+                    'stream': False,
                 },
                 user=user,
                 bypass_filter=True,
@@ -100,9 +98,9 @@ async def run_single_model_health_check(
 
         latency_ms = int((time.perf_counter() - started_at) * 1000)
         return ModelHealthCheckForm(
-            model_id=model["id"],
-            model_name=str(model.get("name") or model["id"]),
-            owned_by=model.get("owned_by"),
+            model_id=model['id'],
+            model_name=str(model.get('name') or model['id']),
+            owned_by=model.get('owned_by'),
             status=True,
             latency_ms=latency_ms,
             error=None,
@@ -111,12 +109,12 @@ async def run_single_model_health_check(
     except Exception as exc:
         latency_ms = int((time.perf_counter() - started_at) * 1000)
         error_message = str(exc).strip() or exc.__class__.__name__
-        log.warning("Model health check failed for %s: %s", model.get("id"), error_message)
+        log.warning('Model health check failed for %s: %s', model.get('id'), error_message)
 
         return ModelHealthCheckForm(
-            model_id=model["id"],
-            model_name=str(model.get("name") or model["id"]),
-            owned_by=model.get("owned_by"),
+            model_id=model['id'],
+            model_name=str(model.get('name') or model['id']),
+            owned_by=model.get('owned_by'),
             status=False,
             latency_ms=latency_ms,
             error=error_message[:1000],
@@ -141,9 +139,7 @@ async def run_model_health_checks(app, refresh_models: bool = True) -> list[Mode
     checks = await asyncio.gather(*(worker(model) for model in models))
 
     ModelHealthChecks.insert_checks(checks)
-    ModelHealthChecks.delete_checks_before(
-        int(time.time()) - MODEL_HEALTH_RETENTION_SECONDS
-    )
+    ModelHealthChecks.delete_checks_before(int(time.time()) - MODEL_HEALTH_RETENTION_SECONDS)
 
     latest_run_at = max((check.checked_at or 0) for check in checks) if checks else None
     app.state.model_health_last_run_at = latest_run_at
@@ -151,9 +147,7 @@ async def run_model_health_checks(app, refresh_models: bool = True) -> list[Mode
     return checks
 
 
-async def maybe_run_model_health_checks(
-    app, refresh_models: bool = True
-) -> list[ModelHealthCheckForm]:
+async def maybe_run_model_health_checks(app, refresh_models: bool = True) -> list[ModelHealthCheckForm]:
     latest_check_at = ModelHealthChecks.get_latest_check_at()
     now = int(time.time())
 
@@ -174,5 +168,5 @@ async def model_health_monitor(app):
     except asyncio.CancelledError:
         raise
     except Exception:
-        log.exception("Model health monitor crashed")
+        log.exception('Model health monitor crashed')
         raise
