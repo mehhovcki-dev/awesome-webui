@@ -10,7 +10,7 @@ from open_webui.internal.db import Base, get_db_context
 
 
 class ModelHealthCheck(Base):
-    __tablename__ = "model_health_check"
+    __tablename__ = 'model_health_check'
 
     id = Column(Text, primary_key=True, unique=True)
     model_id = Column(Text, nullable=False, index=True)
@@ -57,8 +57,8 @@ class ModelHealthCheckTable:
         with get_db_context(db) as db:
             for check in checks:
                 payload = check.model_dump()
-                payload["id"] = str(uuid.uuid4())
-                payload["checked_at"] = payload.get("checked_at") or int(time.time())
+                payload['id'] = str(uuid.uuid4())
+                payload['checked_at'] = payload.get('checked_at') or int(time.time())
 
                 record = ModelHealthCheck(**payload)
                 db.add(record)
@@ -68,9 +68,7 @@ class ModelHealthCheckTable:
 
         return inserted_checks
 
-    def get_checks_since(
-        self, since: int, db: Optional[Session] = None
-    ) -> list[ModelHealthCheckModel]:
+    def get_checks_since(self, since: int, db: Optional[Session] = None) -> list[ModelHealthCheckModel]:
         with get_db_context(db) as db:
             records = (
                 db.query(ModelHealthCheck)
@@ -82,20 +80,12 @@ class ModelHealthCheckTable:
 
     def get_latest_check_at(self, db: Optional[Session] = None) -> Optional[int]:
         with get_db_context(db) as db:
-            record = (
-                db.query(ModelHealthCheck)
-                .order_by(ModelHealthCheck.checked_at.desc())
-                .first()
-            )
+            record = db.query(ModelHealthCheck).order_by(ModelHealthCheck.checked_at.desc()).first()
             return record.checked_at if record else None
 
     def delete_checks_before(self, before: int, db: Optional[Session] = None) -> int:
         with get_db_context(db) as db:
-            deleted = (
-                db.query(ModelHealthCheck)
-                .filter(ModelHealthCheck.checked_at < before)
-                .delete()
-            )
+            deleted = db.query(ModelHealthCheck).filter(ModelHealthCheck.checked_at < before).delete()
             db.commit()
             return int(deleted or 0)
 

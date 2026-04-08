@@ -61,39 +61,39 @@ class ModelHealthStatusResponse(BaseModel):
 
 def resolve_daily_status(successful_checks: int, total_checks: int) -> tuple[str, Optional[float]]:
     if total_checks == 0:
-        return "unknown", None
+        return 'unknown', None
 
     uptime_ratio = successful_checks / total_checks
     if successful_checks == total_checks:
-        return "healthy", uptime_ratio
+        return 'healthy', uptime_ratio
     if successful_checks == 0:
-        return "outage", uptime_ratio
-    return "degraded", uptime_ratio
+        return 'outage', uptime_ratio
+    return 'degraded', uptime_ratio
 
 
 def get_optional_user(request: Request):
-    auth_token = get_http_authorization_cred(request.headers.get("authorization"))
+    auth_token = get_http_authorization_cred(request.headers.get('authorization'))
     token = auth_token.credentials if auth_token is not None else None
 
-    if token is None and "token" in request.cookies:
-        token = request.cookies.get("token")
+    if token is None and 'token' in request.cookies:
+        token = request.cookies.get('token')
 
     if token is None:
         return None
 
     try:
-        if token.startswith("sk-"):
+        if token.startswith('sk-'):
             return get_current_user_by_api_key(request, token)
 
         data = decode_token(token)
-        if data is None or "id" not in data:
+        if data is None or 'id' not in data:
             return None
 
-        user = Users.get_user_by_id(data["id"])
+        user = Users.get_user_by_id(data['id'])
         if user is None:
             return None
 
-        if user.role not in {"user", "admin"}:
+        if user.role not in {'user', 'admin'}:
             return None
 
         return user
@@ -102,12 +102,12 @@ def get_optional_user(request: Request):
 
 
 def filter_visible_models(models: list[dict], user) -> list[dict]:
-    if user is not None and user.role == "admin":
+    if user is not None and user.role == 'admin':
         return models
 
     visible_models = []
     for model in models:
-        access_grants = model.get("info", {}).get("access_grants", [])
+        access_grants = model.get('info', {}).get('access_grants', [])
         if has_public_read_access_grant(access_grants):
             visible_models.append(model)
 
@@ -118,9 +118,9 @@ def _extract_tag_names(raw_tags) -> list[str]:
     names: list[str] = []
     for tag in raw_tags or []:
         if isinstance(tag, dict):
-            name = str(tag.get("name") or "").strip()
+            name = str(tag.get('name') or '').strip()
         else:
-            name = str(tag or "").strip()
+            name = str(tag or '').strip()
 
         if name:
             names.append(name)
@@ -130,8 +130,8 @@ def _extract_tag_names(raw_tags) -> list[str]:
 
 def get_provider_label(model: dict) -> Optional[str]:
     tag_names = [
-        *_extract_tag_names(model.get("tags")),
-        *_extract_tag_names(model.get("info", {}).get("meta", {}).get("tags")),
+        *_extract_tag_names(model.get('tags')),
+        *_extract_tag_names(model.get('info', {}).get('meta', {}).get('tags')),
     ]
 
     seen = set()
@@ -145,17 +145,17 @@ def get_provider_label(model: dict) -> Optional[str]:
 
     for tag_name in normalized_tag_names:
         lowered = tag_name.lower()
-        if lowered.startswith("provider:"):
-            return tag_name.split(":", 1)[1].strip() or model.get("owned_by")
+        if lowered.startswith('provider:'):
+            return tag_name.split(':', 1)[1].strip() or model.get('owned_by')
 
     if normalized_tag_names:
         return normalized_tag_names[0]
 
-    return model.get("owned_by")
+    return model.get('owned_by')
 
 
 @router.get(
-    "",
+    '',
     response_model=ModelHealthStatusResponse,
 )
 async def get_model_health_status(request: Request):
@@ -174,13 +174,12 @@ async def get_model_health_status(request: Request):
         checks_by_model[check.model_id].append(check)
 
     day_labels = [
-        (now.date() - timedelta(days=offset)).isoformat()
-        for offset in reversed(range(MODEL_HEALTH_HISTORY_DAYS))
+        (now.date() - timedelta(days=offset)).isoformat() for offset in reversed(range(MODEL_HEALTH_HISTORY_DAYS))
     ]
 
     status_items: list[ModelHealthStatusItem] = []
     for model in models:
-        model_checks = checks_by_model.get(model["id"], [])
+        model_checks = checks_by_model.get(model['id'], [])
         latest_check = model_checks[-1] if model_checks else None
 
         daily_success_counts: dict[str, int] = defaultdict(int)
@@ -210,14 +209,12 @@ async def get_model_health_status(request: Request):
             )
 
         total_checks_90d = len(model_checks)
-        uptime_ratio_90d = (
-            successful_checks_90d / total_checks_90d if total_checks_90d > 0 else None
-        )
+        uptime_ratio_90d = successful_checks_90d / total_checks_90d if total_checks_90d > 0 else None
 
         status_items.append(
             ModelHealthStatusItem(
-                id=model["id"],
-                name=str(model.get("name") or model["id"]),
+                id=model['id'],
+                name=str(model.get('name') or model['id']),
                 provider=get_provider_label(model),
                 latest=(
                     ModelHealthLatestStatus(
@@ -245,7 +242,7 @@ async def get_model_health_status(request: Request):
 
     return ModelHealthStatusResponse(
         generated_at=int(now.timestamp()),
-        last_run_at=getattr(request.app.state, "model_health_last_run_at", None),
+        last_run_at=getattr(request.app.state, 'model_health_last_run_at', None),
         check_interval_seconds=MODEL_HEALTH_CHECK_INTERVAL_SECONDS,
         history_window_days=MODEL_HEALTH_HISTORY_DAYS,
         models=status_items,

@@ -98,9 +98,7 @@ router = APIRouter()
 
 log = logging.getLogger(__name__)
 
-signin_rate_limiter = RateLimiter(
-    redis_client=get_redis_client(), limit=5 * 3, window=60 * 3
-)
+signin_rate_limiter = RateLimiter(redis_client=get_redis_client(), limit=5 * 3, window=60 * 3)
 
 
 def _sanitize_oauth_provider_list(provider_list):
@@ -130,26 +128,26 @@ def _sanitize_notification_sound_library(raw_sounds) -> list[dict]:
         if not isinstance(item, dict):
             continue
 
-        sound_id = _sanitize_text(item.get("id"), 128)
+        sound_id = _sanitize_text(item.get('id'), 128)
         if not sound_id:
             continue
 
-        sound_name = _sanitize_text(item.get("name"), 128) or "Notification sound"
-        sound_type = _sanitize_text(item.get("type"), 32).lower()
-        if sound_type not in {"channel", "chat_completion"}:
+        sound_name = _sanitize_text(item.get('name'), 128) or 'Notification sound'
+        sound_type = _sanitize_text(item.get('type'), 32).lower()
+        if sound_type not in {'channel', 'chat_completion'}:
             continue
 
-        data_url = _sanitize_text(item.get("data_url"), 6_000_000)
+        data_url = _sanitize_text(item.get('data_url'), 6_000_000)
         # Accept only inline audio payloads to avoid remote URL abuse.
-        if not data_url.startswith("data:audio/"):
+        if not data_url.startswith('data:audio/'):
             continue
 
         sanitized.append(
             {
-                "id": sound_id,
-                "name": sound_name,
-                "type": sound_type,
-                "data_url": data_url,
+                'id': sound_id,
+                'name': sound_name,
+                'type': sound_type,
+                'data_url': data_url,
             }
         )
 
@@ -167,30 +165,30 @@ def _sanitize_custom_emoji_library(raw_emojis) -> list[dict]:
         if not isinstance(item, dict):
             continue
 
-        emoji_id = _sanitize_text(item.get("id"), 128)
+        emoji_id = _sanitize_text(item.get('id'), 128)
         if not emoji_id:
             continue
 
         emoji_name = re.sub(
-            r"[^a-z0-9_]",
-            "",
-            _sanitize_text(item.get("name"), 64).lower(),
+            r'[^a-z0-9_]',
+            '',
+            _sanitize_text(item.get('name'), 64).lower(),
         )[:32]
         if len(emoji_name) < 2 or emoji_name in seen_names:
             continue
 
-        data_url = _sanitize_text(item.get("data_url"), 6_000_000)
+        data_url = _sanitize_text(item.get('data_url'), 6_000_000)
         if not re.match(
-            r"^data:image\/(?:png|jpe?g|webp|gif|avif|svg\+xml);base64,",
+            r'^data:image\/(?:png|jpe?g|webp|gif|avif|svg\+xml);base64,',
             data_url,
             flags=re.IGNORECASE,
         ):
             continue
 
-        created_by = _sanitize_text(item.get("created_by"), 128)
-        created_by_name = _sanitize_text(item.get("created_by_name"), 128)
+        created_by = _sanitize_text(item.get('created_by'), 128)
+        created_by_name = _sanitize_text(item.get('created_by_name'), 128)
 
-        created_at_raw = item.get("created_at")
+        created_at_raw = item.get('created_at')
         if isinstance(created_at_raw, (int, float)):
             created_at = int(created_at_raw)
         else:
@@ -198,12 +196,12 @@ def _sanitize_custom_emoji_library(raw_emojis) -> list[dict]:
 
         sanitized.append(
             {
-                "id": emoji_id,
-                "name": emoji_name,
-                "data_url": data_url,
-                "created_by": created_by or None,
-                "created_by_name": created_by_name or None,
-                "created_at": created_at,
+                'id': emoji_id,
+                'name': emoji_name,
+                'data_url': data_url,
+                'created_by': created_by or None,
+                'created_by_name': created_by_name or None,
+                'created_at': created_at,
             }
         )
         seen_names.add(emoji_name)
@@ -212,7 +210,7 @@ def _sanitize_custom_emoji_library(raw_emojis) -> list[dict]:
 
 
 def _sanitize_text(value, max_length: int | None = None) -> str:
-    text = str(value or "").strip()
+    text = str(value or '').strip()
     if max_length is not None:
         return text[:max_length]
     return text
@@ -221,15 +219,15 @@ def _sanitize_text(value, max_length: int | None = None) -> str:
 def _sanitize_oauth_timeout(value) -> str:
     text = _sanitize_text(value, 16)
     if not text:
-        return ""
-    return text if text.isdigit() else ""
+        return ''
+    return text if text.isdigit() else ''
 
 
 def _sanitize_oauth_code_challenge_method(value) -> str | None:
     text = _sanitize_text(value, 16).upper()
-    if text in ["", "NONE"]:
+    if text in ['', 'NONE']:
         return None
-    if text == "S256":
+    if text == 'S256':
         return text
     return None
 
@@ -241,132 +239,130 @@ def _reload_oauth_runtime(request: Request):
 
 def _serialize_admin_config(request: Request) -> dict:
     return {
-        "SHOW_ADMIN_DETAILS": request.app.state.config.SHOW_ADMIN_DETAILS,
-        "ADMIN_EMAIL": request.app.state.config.ADMIN_EMAIL,
-        "WEBUI_URL": request.app.state.config.WEBUI_URL,
-        "ENABLE_SIGNUP": request.app.state.config.ENABLE_SIGNUP,
-        "ENABLE_PASSWORD_SIGNUP": request.app.state.config.ENABLE_PASSWORD_SIGNUP,
-        "ENABLE_OAUTH_LOGIN": request.app.state.config.ENABLE_OAUTH_LOGIN,
-        "ENABLE_OAUTH_SIGNUP": request.app.state.config.ENABLE_OAUTH_SIGNUP,
-        "OAUTH_ALLOWED_LOGIN_PROVIDERS": request.app.state.config.OAUTH_ALLOWED_LOGIN_PROVIDERS,
-        "OAUTH_ALLOWED_SIGNUP_PROVIDERS": request.app.state.config.OAUTH_ALLOWED_SIGNUP_PROVIDERS,
-        "OAUTH_MERGE_ACCOUNTS_BY_EMAIL": request.app.state.config.OAUTH_MERGE_ACCOUNTS_BY_EMAIL,
-        "OAUTH_TIMEOUT": request.app.state.config.OAUTH_TIMEOUT,
-        "OAUTH_AUDIENCE": request.app.state.config.OAUTH_AUDIENCE,
-        "GOOGLE_OAUTH_ENABLED": request.app.state.config.GOOGLE_OAUTH_ENABLED,
-        "GOOGLE_CLIENT_ID": request.app.state.config.GOOGLE_CLIENT_ID,
-        "GOOGLE_CLIENT_SECRET": request.app.state.config.GOOGLE_CLIENT_SECRET,
-        "GOOGLE_OAUTH_SCOPE": request.app.state.config.GOOGLE_OAUTH_SCOPE,
-        "GOOGLE_SERVER_METADATA_URL": request.app.state.config.GOOGLE_SERVER_METADATA_URL,
-        "GOOGLE_REDIRECT_URI": request.app.state.config.GOOGLE_REDIRECT_URI,
-        "MICROSOFT_OAUTH_ENABLED": request.app.state.config.MICROSOFT_OAUTH_ENABLED,
-        "MICROSOFT_CLIENT_ID": request.app.state.config.MICROSOFT_CLIENT_ID,
-        "MICROSOFT_CLIENT_SECRET": request.app.state.config.MICROSOFT_CLIENT_SECRET,
-        "MICROSOFT_CLIENT_TENANT_ID": request.app.state.config.MICROSOFT_CLIENT_TENANT_ID,
-        "MICROSOFT_CLIENT_LOGIN_BASE_URL": request.app.state.config.MICROSOFT_CLIENT_LOGIN_BASE_URL,
-        "MICROSOFT_CLIENT_PICTURE_URL": request.app.state.config.MICROSOFT_CLIENT_PICTURE_URL,
-        "MICROSOFT_OAUTH_SCOPE": request.app.state.config.MICROSOFT_OAUTH_SCOPE,
-        "MICROSOFT_REDIRECT_URI": request.app.state.config.MICROSOFT_REDIRECT_URI,
-        "GITHUB_OAUTH_ENABLED": request.app.state.config.GITHUB_OAUTH_ENABLED,
-        "GITHUB_CLIENT_ID": request.app.state.config.GITHUB_CLIENT_ID,
-        "GITHUB_CLIENT_SECRET": request.app.state.config.GITHUB_CLIENT_SECRET,
-        "GITHUB_CLIENT_SCOPE": request.app.state.config.GITHUB_CLIENT_SCOPE,
-        "GITHUB_CLIENT_REDIRECT_URI": request.app.state.config.GITHUB_CLIENT_REDIRECT_URI,
-        "GITHUB_ACCESS_TOKEN_URL": request.app.state.config.GITHUB_ACCESS_TOKEN_URL,
-        "GITHUB_AUTHORIZE_URL": request.app.state.config.GITHUB_AUTHORIZE_URL,
-        "GITHUB_API_BASE_URL": request.app.state.config.GITHUB_API_BASE_URL,
-        "GITHUB_USERINFO_ENDPOINT": request.app.state.config.GITHUB_USERINFO_ENDPOINT,
-        "OIDC_OAUTH_ENABLED": request.app.state.config.OIDC_OAUTH_ENABLED,
-        "OAUTH_PROVIDER_NAME": request.app.state.config.OAUTH_PROVIDER_NAME,
-        "OAUTH_CLIENT_ID": request.app.state.config.OAUTH_CLIENT_ID,
-        "OAUTH_CLIENT_SECRET": request.app.state.config.OAUTH_CLIENT_SECRET,
-        "OPENID_PROVIDER_URL": request.app.state.config.OPENID_PROVIDER_URL,
-        "OPENID_REDIRECT_URI": request.app.state.config.OPENID_REDIRECT_URI,
-        "OAUTH_SCOPES": request.app.state.config.OAUTH_SCOPES,
-        "OAUTH_TOKEN_ENDPOINT_AUTH_METHOD": request.app.state.config.OAUTH_TOKEN_ENDPOINT_AUTH_METHOD,
-        "OAUTH_CODE_CHALLENGE_METHOD": request.app.state.config.OAUTH_CODE_CHALLENGE_METHOD,
-        "OAUTH_SUB_CLAIM": request.app.state.config.OAUTH_SUB_CLAIM,
-        "OAUTH_USERNAME_CLAIM": request.app.state.config.OAUTH_USERNAME_CLAIM,
-        "OAUTH_EMAIL_CLAIM": request.app.state.config.OAUTH_EMAIL_CLAIM,
-        "OAUTH_PICTURE_CLAIM": request.app.state.config.OAUTH_PICTURE_CLAIM,
-        "OAUTH_GROUPS_CLAIM": request.app.state.config.OAUTH_GROUPS_CLAIM,
-        "FEISHU_OAUTH_ENABLED": request.app.state.config.FEISHU_OAUTH_ENABLED,
-        "FEISHU_CLIENT_ID": request.app.state.config.FEISHU_CLIENT_ID,
-        "FEISHU_CLIENT_SECRET": request.app.state.config.FEISHU_CLIENT_SECRET,
-        "FEISHU_OAUTH_SCOPE": request.app.state.config.FEISHU_OAUTH_SCOPE,
-        "FEISHU_REDIRECT_URI": request.app.state.config.FEISHU_REDIRECT_URI,
-        "FEISHU_ACCESS_TOKEN_URL": request.app.state.config.FEISHU_ACCESS_TOKEN_URL,
-        "FEISHU_AUTHORIZE_URL": request.app.state.config.FEISHU_AUTHORIZE_URL,
-        "FEISHU_API_BASE_URL": request.app.state.config.FEISHU_API_BASE_URL,
-        "FEISHU_USERINFO_ENDPOINT": request.app.state.config.FEISHU_USERINFO_ENDPOINT,
-        "DISCORD_OAUTH_ENABLED": request.app.state.config.DISCORD_OAUTH_ENABLED,
-        "DISCORD_CLIENT_ID": request.app.state.config.DISCORD_CLIENT_ID,
-        "DISCORD_CLIENT_SECRET": request.app.state.config.DISCORD_CLIENT_SECRET,
-        "DISCORD_OAUTH_SCOPE": request.app.state.config.DISCORD_OAUTH_SCOPE,
-        "DISCORD_REDIRECT_URI": request.app.state.config.DISCORD_REDIRECT_URI,
-        "DISCORD_ACCESS_TOKEN_URL": request.app.state.config.DISCORD_ACCESS_TOKEN_URL,
-        "DISCORD_AUTHORIZE_URL": request.app.state.config.DISCORD_AUTHORIZE_URL,
-        "DISCORD_API_BASE_URL": request.app.state.config.DISCORD_API_BASE_URL,
-        "DISCORD_USERINFO_ENDPOINT": request.app.state.config.DISCORD_USERINFO_ENDPOINT,
-        "GITLAB_OAUTH_ENABLED": request.app.state.config.GITLAB_OAUTH_ENABLED,
-        "GITLAB_CLIENT_ID": request.app.state.config.GITLAB_CLIENT_ID,
-        "GITLAB_CLIENT_SECRET": request.app.state.config.GITLAB_CLIENT_SECRET,
-        "GITLAB_OAUTH_SCOPE": request.app.state.config.GITLAB_OAUTH_SCOPE,
-        "GITLAB_REDIRECT_URI": request.app.state.config.GITLAB_REDIRECT_URI,
-        "GITLAB_ACCESS_TOKEN_URL": request.app.state.config.GITLAB_ACCESS_TOKEN_URL,
-        "GITLAB_AUTHORIZE_URL": request.app.state.config.GITLAB_AUTHORIZE_URL,
-        "GITLAB_API_BASE_URL": request.app.state.config.GITLAB_API_BASE_URL,
-        "GITLAB_USERINFO_ENDPOINT": request.app.state.config.GITLAB_USERINFO_ENDPOINT,
-        "SLACK_OAUTH_ENABLED": request.app.state.config.SLACK_OAUTH_ENABLED,
-        "SLACK_CLIENT_ID": request.app.state.config.SLACK_CLIENT_ID,
-        "SLACK_CLIENT_SECRET": request.app.state.config.SLACK_CLIENT_SECRET,
-        "SLACK_OAUTH_SCOPE": request.app.state.config.SLACK_OAUTH_SCOPE,
-        "SLACK_REDIRECT_URI": request.app.state.config.SLACK_REDIRECT_URI,
-        "SLACK_ACCESS_TOKEN_URL": request.app.state.config.SLACK_ACCESS_TOKEN_URL,
-        "SLACK_AUTHORIZE_URL": request.app.state.config.SLACK_AUTHORIZE_URL,
-        "SLACK_API_BASE_URL": request.app.state.config.SLACK_API_BASE_URL,
-        "SLACK_USERINFO_ENDPOINT": request.app.state.config.SLACK_USERINFO_ENDPOINT,
-        "ENABLE_INVITE_ONLY_AUTH": request.app.state.config.ENABLE_INVITE_ONLY_AUTH,
-        "INVITE_CREATOR_SCOPE": request.app.state.config.INVITE_CREATOR_SCOPE,
-        "INVITE_CREATOR_GROUP_IDS": request.app.state.config.INVITE_CREATOR_GROUP_IDS,
-        "INVITE_CREATOR_COOLDOWN_SECONDS": request.app.state.config.INVITE_CREATOR_COOLDOWN_SECONDS,
-        "INVITE_CODE_LENGTH": request.app.state.config.INVITE_CODE_LENGTH,
-        "INVITE_CODE_TTL_SECONDS": request.app.state.config.INVITE_CODE_TTL_SECONDS,
-        "INVITE_CODE_PREFIX": request.app.state.config.INVITE_CODE_PREFIX,
-        "INVITE_CODE_REUSABLE": request.app.state.config.INVITE_CODE_REUSABLE,
-        "INVITE_CODE_MAX_USES": request.app.state.config.INVITE_CODE_MAX_USES,
-        "ENABLE_API_KEYS": request.app.state.config.ENABLE_API_KEYS,
-        "ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS": request.app.state.config.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS,
-        "API_KEYS_ALLOWED_ENDPOINTS": request.app.state.config.API_KEYS_ALLOWED_ENDPOINTS,
-        "DEFAULT_USER_ROLE": request.app.state.config.DEFAULT_USER_ROLE,
-        "DEFAULT_GROUP_ID": request.app.state.config.DEFAULT_GROUP_ID,
-        "JWT_EXPIRES_IN": request.app.state.config.JWT_EXPIRES_IN,
-        "ENABLE_COMMUNITY_SHARING": request.app.state.config.ENABLE_COMMUNITY_SHARING,
-        "ENABLE_MESSAGE_RATING": request.app.state.config.ENABLE_MESSAGE_RATING,
-        "ENABLE_FOLDERS": request.app.state.config.ENABLE_FOLDERS,
-        "FOLDER_MAX_FILE_COUNT": request.app.state.config.FOLDER_MAX_FILE_COUNT,
-        "ENABLE_CHANNELS": request.app.state.config.ENABLE_CHANNELS,
-        "ENABLE_MEMORIES": request.app.state.config.ENABLE_MEMORIES,
-        "ENABLE_NOTES": request.app.state.config.ENABLE_NOTES,
-        "ENABLE_USER_WEBHOOKS": request.app.state.config.ENABLE_USER_WEBHOOKS,
-        "ENABLE_USER_STATUS": request.app.state.config.ENABLE_USER_STATUS,
-        "ENABLE_SYSTEM_NOTICE": request.app.state.config.ENABLE_SYSTEM_NOTICE,
-        "SYSTEM_NOTICE_TITLE": request.app.state.config.SYSTEM_NOTICE_TITLE,
-        "SYSTEM_NOTICE_CONTENT": request.app.state.config.SYSTEM_NOTICE_CONTENT,
-        "ENABLE_MOTD": request.app.state.config.ENABLE_MOTD,
-        "MOTD_TITLE": request.app.state.config.MOTD_TITLE,
-        "MOTD_CONTENT": request.app.state.config.MOTD_CONTENT,
-        "NOTIFICATION_SOUND_LIBRARY": request.app.state.config.NOTIFICATION_SOUND_LIBRARY,
-        "CUSTOM_EMOJI_LIBRARY": request.app.state.config.CUSTOM_EMOJI_LIBRARY,
-        "PENDING_USER_OVERLAY_TITLE": request.app.state.config.PENDING_USER_OVERLAY_TITLE,
-        "PENDING_USER_OVERLAY_CONTENT": request.app.state.config.PENDING_USER_OVERLAY_CONTENT,
-        "RESPONSE_WATERMARK": request.app.state.config.RESPONSE_WATERMARK,
+        'SHOW_ADMIN_DETAILS': request.app.state.config.SHOW_ADMIN_DETAILS,
+        'ADMIN_EMAIL': request.app.state.config.ADMIN_EMAIL,
+        'WEBUI_URL': request.app.state.config.WEBUI_URL,
+        'ENABLE_SIGNUP': request.app.state.config.ENABLE_SIGNUP,
+        'ENABLE_PASSWORD_SIGNUP': request.app.state.config.ENABLE_PASSWORD_SIGNUP,
+        'ENABLE_OAUTH_LOGIN': request.app.state.config.ENABLE_OAUTH_LOGIN,
+        'ENABLE_OAUTH_SIGNUP': request.app.state.config.ENABLE_OAUTH_SIGNUP,
+        'OAUTH_ALLOWED_LOGIN_PROVIDERS': request.app.state.config.OAUTH_ALLOWED_LOGIN_PROVIDERS,
+        'OAUTH_ALLOWED_SIGNUP_PROVIDERS': request.app.state.config.OAUTH_ALLOWED_SIGNUP_PROVIDERS,
+        'OAUTH_MERGE_ACCOUNTS_BY_EMAIL': request.app.state.config.OAUTH_MERGE_ACCOUNTS_BY_EMAIL,
+        'OAUTH_TIMEOUT': request.app.state.config.OAUTH_TIMEOUT,
+        'OAUTH_AUDIENCE': request.app.state.config.OAUTH_AUDIENCE,
+        'GOOGLE_OAUTH_ENABLED': request.app.state.config.GOOGLE_OAUTH_ENABLED,
+        'GOOGLE_CLIENT_ID': request.app.state.config.GOOGLE_CLIENT_ID,
+        'GOOGLE_CLIENT_SECRET': request.app.state.config.GOOGLE_CLIENT_SECRET,
+        'GOOGLE_OAUTH_SCOPE': request.app.state.config.GOOGLE_OAUTH_SCOPE,
+        'GOOGLE_SERVER_METADATA_URL': request.app.state.config.GOOGLE_SERVER_METADATA_URL,
+        'GOOGLE_REDIRECT_URI': request.app.state.config.GOOGLE_REDIRECT_URI,
+        'MICROSOFT_OAUTH_ENABLED': request.app.state.config.MICROSOFT_OAUTH_ENABLED,
+        'MICROSOFT_CLIENT_ID': request.app.state.config.MICROSOFT_CLIENT_ID,
+        'MICROSOFT_CLIENT_SECRET': request.app.state.config.MICROSOFT_CLIENT_SECRET,
+        'MICROSOFT_CLIENT_TENANT_ID': request.app.state.config.MICROSOFT_CLIENT_TENANT_ID,
+        'MICROSOFT_CLIENT_LOGIN_BASE_URL': request.app.state.config.MICROSOFT_CLIENT_LOGIN_BASE_URL,
+        'MICROSOFT_CLIENT_PICTURE_URL': request.app.state.config.MICROSOFT_CLIENT_PICTURE_URL,
+        'MICROSOFT_OAUTH_SCOPE': request.app.state.config.MICROSOFT_OAUTH_SCOPE,
+        'MICROSOFT_REDIRECT_URI': request.app.state.config.MICROSOFT_REDIRECT_URI,
+        'GITHUB_OAUTH_ENABLED': request.app.state.config.GITHUB_OAUTH_ENABLED,
+        'GITHUB_CLIENT_ID': request.app.state.config.GITHUB_CLIENT_ID,
+        'GITHUB_CLIENT_SECRET': request.app.state.config.GITHUB_CLIENT_SECRET,
+        'GITHUB_CLIENT_SCOPE': request.app.state.config.GITHUB_CLIENT_SCOPE,
+        'GITHUB_CLIENT_REDIRECT_URI': request.app.state.config.GITHUB_CLIENT_REDIRECT_URI,
+        'GITHUB_ACCESS_TOKEN_URL': request.app.state.config.GITHUB_ACCESS_TOKEN_URL,
+        'GITHUB_AUTHORIZE_URL': request.app.state.config.GITHUB_AUTHORIZE_URL,
+        'GITHUB_API_BASE_URL': request.app.state.config.GITHUB_API_BASE_URL,
+        'GITHUB_USERINFO_ENDPOINT': request.app.state.config.GITHUB_USERINFO_ENDPOINT,
+        'OIDC_OAUTH_ENABLED': request.app.state.config.OIDC_OAUTH_ENABLED,
+        'OAUTH_PROVIDER_NAME': request.app.state.config.OAUTH_PROVIDER_NAME,
+        'OAUTH_CLIENT_ID': request.app.state.config.OAUTH_CLIENT_ID,
+        'OAUTH_CLIENT_SECRET': request.app.state.config.OAUTH_CLIENT_SECRET,
+        'OPENID_PROVIDER_URL': request.app.state.config.OPENID_PROVIDER_URL,
+        'OPENID_REDIRECT_URI': request.app.state.config.OPENID_REDIRECT_URI,
+        'OAUTH_SCOPES': request.app.state.config.OAUTH_SCOPES,
+        'OAUTH_TOKEN_ENDPOINT_AUTH_METHOD': request.app.state.config.OAUTH_TOKEN_ENDPOINT_AUTH_METHOD,
+        'OAUTH_CODE_CHALLENGE_METHOD': request.app.state.config.OAUTH_CODE_CHALLENGE_METHOD,
+        'OAUTH_SUB_CLAIM': request.app.state.config.OAUTH_SUB_CLAIM,
+        'OAUTH_USERNAME_CLAIM': request.app.state.config.OAUTH_USERNAME_CLAIM,
+        'OAUTH_EMAIL_CLAIM': request.app.state.config.OAUTH_EMAIL_CLAIM,
+        'OAUTH_PICTURE_CLAIM': request.app.state.config.OAUTH_PICTURE_CLAIM,
+        'OAUTH_GROUPS_CLAIM': request.app.state.config.OAUTH_GROUPS_CLAIM,
+        'FEISHU_OAUTH_ENABLED': request.app.state.config.FEISHU_OAUTH_ENABLED,
+        'FEISHU_CLIENT_ID': request.app.state.config.FEISHU_CLIENT_ID,
+        'FEISHU_CLIENT_SECRET': request.app.state.config.FEISHU_CLIENT_SECRET,
+        'FEISHU_OAUTH_SCOPE': request.app.state.config.FEISHU_OAUTH_SCOPE,
+        'FEISHU_REDIRECT_URI': request.app.state.config.FEISHU_REDIRECT_URI,
+        'FEISHU_ACCESS_TOKEN_URL': request.app.state.config.FEISHU_ACCESS_TOKEN_URL,
+        'FEISHU_AUTHORIZE_URL': request.app.state.config.FEISHU_AUTHORIZE_URL,
+        'FEISHU_API_BASE_URL': request.app.state.config.FEISHU_API_BASE_URL,
+        'FEISHU_USERINFO_ENDPOINT': request.app.state.config.FEISHU_USERINFO_ENDPOINT,
+        'DISCORD_OAUTH_ENABLED': request.app.state.config.DISCORD_OAUTH_ENABLED,
+        'DISCORD_CLIENT_ID': request.app.state.config.DISCORD_CLIENT_ID,
+        'DISCORD_CLIENT_SECRET': request.app.state.config.DISCORD_CLIENT_SECRET,
+        'DISCORD_OAUTH_SCOPE': request.app.state.config.DISCORD_OAUTH_SCOPE,
+        'DISCORD_REDIRECT_URI': request.app.state.config.DISCORD_REDIRECT_URI,
+        'DISCORD_ACCESS_TOKEN_URL': request.app.state.config.DISCORD_ACCESS_TOKEN_URL,
+        'DISCORD_AUTHORIZE_URL': request.app.state.config.DISCORD_AUTHORIZE_URL,
+        'DISCORD_API_BASE_URL': request.app.state.config.DISCORD_API_BASE_URL,
+        'DISCORD_USERINFO_ENDPOINT': request.app.state.config.DISCORD_USERINFO_ENDPOINT,
+        'GITLAB_OAUTH_ENABLED': request.app.state.config.GITLAB_OAUTH_ENABLED,
+        'GITLAB_CLIENT_ID': request.app.state.config.GITLAB_CLIENT_ID,
+        'GITLAB_CLIENT_SECRET': request.app.state.config.GITLAB_CLIENT_SECRET,
+        'GITLAB_OAUTH_SCOPE': request.app.state.config.GITLAB_OAUTH_SCOPE,
+        'GITLAB_REDIRECT_URI': request.app.state.config.GITLAB_REDIRECT_URI,
+        'GITLAB_ACCESS_TOKEN_URL': request.app.state.config.GITLAB_ACCESS_TOKEN_URL,
+        'GITLAB_AUTHORIZE_URL': request.app.state.config.GITLAB_AUTHORIZE_URL,
+        'GITLAB_API_BASE_URL': request.app.state.config.GITLAB_API_BASE_URL,
+        'GITLAB_USERINFO_ENDPOINT': request.app.state.config.GITLAB_USERINFO_ENDPOINT,
+        'SLACK_OAUTH_ENABLED': request.app.state.config.SLACK_OAUTH_ENABLED,
+        'SLACK_CLIENT_ID': request.app.state.config.SLACK_CLIENT_ID,
+        'SLACK_CLIENT_SECRET': request.app.state.config.SLACK_CLIENT_SECRET,
+        'SLACK_OAUTH_SCOPE': request.app.state.config.SLACK_OAUTH_SCOPE,
+        'SLACK_REDIRECT_URI': request.app.state.config.SLACK_REDIRECT_URI,
+        'SLACK_ACCESS_TOKEN_URL': request.app.state.config.SLACK_ACCESS_TOKEN_URL,
+        'SLACK_AUTHORIZE_URL': request.app.state.config.SLACK_AUTHORIZE_URL,
+        'SLACK_API_BASE_URL': request.app.state.config.SLACK_API_BASE_URL,
+        'SLACK_USERINFO_ENDPOINT': request.app.state.config.SLACK_USERINFO_ENDPOINT,
+        'ENABLE_INVITE_ONLY_AUTH': request.app.state.config.ENABLE_INVITE_ONLY_AUTH,
+        'INVITE_CREATOR_SCOPE': request.app.state.config.INVITE_CREATOR_SCOPE,
+        'INVITE_CREATOR_GROUP_IDS': request.app.state.config.INVITE_CREATOR_GROUP_IDS,
+        'INVITE_CREATOR_COOLDOWN_SECONDS': request.app.state.config.INVITE_CREATOR_COOLDOWN_SECONDS,
+        'INVITE_CODE_LENGTH': request.app.state.config.INVITE_CODE_LENGTH,
+        'INVITE_CODE_TTL_SECONDS': request.app.state.config.INVITE_CODE_TTL_SECONDS,
+        'INVITE_CODE_PREFIX': request.app.state.config.INVITE_CODE_PREFIX,
+        'INVITE_CODE_REUSABLE': request.app.state.config.INVITE_CODE_REUSABLE,
+        'INVITE_CODE_MAX_USES': request.app.state.config.INVITE_CODE_MAX_USES,
+        'ENABLE_API_KEYS': request.app.state.config.ENABLE_API_KEYS,
+        'ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS': request.app.state.config.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS,
+        'API_KEYS_ALLOWED_ENDPOINTS': request.app.state.config.API_KEYS_ALLOWED_ENDPOINTS,
+        'DEFAULT_USER_ROLE': request.app.state.config.DEFAULT_USER_ROLE,
+        'DEFAULT_GROUP_ID': request.app.state.config.DEFAULT_GROUP_ID,
+        'JWT_EXPIRES_IN': request.app.state.config.JWT_EXPIRES_IN,
+        'ENABLE_COMMUNITY_SHARING': request.app.state.config.ENABLE_COMMUNITY_SHARING,
+        'ENABLE_MESSAGE_RATING': request.app.state.config.ENABLE_MESSAGE_RATING,
+        'ENABLE_FOLDERS': request.app.state.config.ENABLE_FOLDERS,
+        'FOLDER_MAX_FILE_COUNT': request.app.state.config.FOLDER_MAX_FILE_COUNT,
+        'ENABLE_CHANNELS': request.app.state.config.ENABLE_CHANNELS,
+        'ENABLE_MEMORIES': request.app.state.config.ENABLE_MEMORIES,
+        'ENABLE_NOTES': request.app.state.config.ENABLE_NOTES,
+        'ENABLE_USER_WEBHOOKS': request.app.state.config.ENABLE_USER_WEBHOOKS,
+        'ENABLE_USER_STATUS': request.app.state.config.ENABLE_USER_STATUS,
+        'ENABLE_SYSTEM_NOTICE': request.app.state.config.ENABLE_SYSTEM_NOTICE,
+        'SYSTEM_NOTICE_TITLE': request.app.state.config.SYSTEM_NOTICE_TITLE,
+        'SYSTEM_NOTICE_CONTENT': request.app.state.config.SYSTEM_NOTICE_CONTENT,
+        'ENABLE_MOTD': request.app.state.config.ENABLE_MOTD,
+        'MOTD_TITLE': request.app.state.config.MOTD_TITLE,
+        'MOTD_CONTENT': request.app.state.config.MOTD_CONTENT,
+        'NOTIFICATION_SOUND_LIBRARY': request.app.state.config.NOTIFICATION_SOUND_LIBRARY,
+        'CUSTOM_EMOJI_LIBRARY': request.app.state.config.CUSTOM_EMOJI_LIBRARY,
+        'PENDING_USER_OVERLAY_TITLE': request.app.state.config.PENDING_USER_OVERLAY_TITLE,
+        'PENDING_USER_OVERLAY_CONTENT': request.app.state.config.PENDING_USER_OVERLAY_CONTENT,
+        'RESPONSE_WATERMARK': request.app.state.config.RESPONSE_WATERMARK,
     }
 
 
-def create_session_response(
-    request: Request, user, db, response: Response = None, set_cookie: bool = False
-) -> dict:
+def create_session_response(request: Request, user, db, response: Response = None, set_cookie: bool = False) -> dict:
     """
     Create JWT token and build session response for a user.
     Shared helper for signin, signup, ldap_auth, add_user, and token_exchange endpoints.
@@ -384,18 +380,14 @@ def create_session_response(
         expires_at = int(time.time()) + int(expires_delta.total_seconds())
 
     token = create_token(
-        data={"id": user.id},
+        data={'id': user.id},
         expires_delta=expires_delta,
     )
 
     if set_cookie and response:
-        datetime_expires_at = (
-            datetime.datetime.fromtimestamp(expires_at, datetime.timezone.utc)
-            if expires_at
-            else None
-        )
+        datetime_expires_at = datetime.datetime.fromtimestamp(expires_at, datetime.timezone.utc) if expires_at else None
         response.set_cookie(
-            key="token",
+            key='token',
             value=token,
             expires=datetime_expires_at,
             httponly=True,
@@ -403,29 +395,27 @@ def create_session_response(
             secure=WEBUI_AUTH_COOKIE_SECURE,
         )
 
-    user_permissions = get_permissions(
-        user.id, request.app.state.config.USER_PERMISSIONS, db=db
-    )
+    user_permissions = get_permissions(user.id, request.app.state.config.USER_PERMISSIONS, db=db)
     auth = Auths.get_auth_by_id(user.id, db=db)
     has_password = auth.password_login_enabled if auth else True
     password_change_required = auth.password_change_required if auth else False
 
     return {
-        "token": token,
-        "token_type": "Bearer",
-        "expires_at": expires_at,
-        "id": user.id,
-        "email": user.email,
-        "name": user.name,
-        "role": user.role,
-        "profile_image_url": f"/api/v1/users/{user.id}/profile/image",
-        "presence_state": user.presence_state,
-        "status_emoji": user.status_emoji,
-        "status_message": user.status_message,
-        "status_expires_at": user.status_expires_at,
-        "has_password": has_password,
-        "password_change_required": password_change_required,
-        "permissions": user_permissions,
+        'token': token,
+        'token_type': 'Bearer',
+        'expires_at': expires_at,
+        'id': user.id,
+        'email': user.email,
+        'name': user.name,
+        'role': user.role,
+        'profile_image_url': f'/api/v1/users/{user.id}/profile/image',
+        'presence_state': user.presence_state,
+        'status_emoji': user.status_emoji,
+        'status_message': user.status_message,
+        'status_expires_at': user.status_expires_at,
+        'has_password': has_password,
+        'password_change_required': password_change_required,
+        'permissions': user_permissions,
     }
 
 
@@ -452,7 +442,7 @@ class SessionUserInfoResponse(SessionUserResponse, UserStatus):
     oauth: Optional[dict] = None
 
 
-@router.get("/", response_model=SessionUserInfoResponse)
+@router.get('/', response_model=SessionUserInfoResponse)
 async def get_session_user(
     request: Request,
     response: Response,
@@ -460,7 +450,7 @@ async def get_session_user(
     db: Session = Depends(get_session),
 ):
 
-    auth_header = request.headers.get("Authorization")
+    auth_header = request.headers.get('Authorization')
     auth_token = get_http_authorization_cred(auth_header)
     token = auth_token.credentials
     data = decode_token(token)
@@ -468,7 +458,7 @@ async def get_session_user(
     expires_at = None
 
     if data:
-        expires_at = data.get("exp")
+        expires_at = data.get('exp')
 
         if (expires_at is not None) and int(time.time()) > expires_at:
             raise HTTPException(
@@ -478,45 +468,39 @@ async def get_session_user(
 
         # Set the cookie token
         response.set_cookie(
-            key="token",
+            key='token',
             value=token,
-            expires=(
-                datetime.datetime.fromtimestamp(expires_at, datetime.timezone.utc)
-                if expires_at
-                else None
-            ),
+            expires=(datetime.datetime.fromtimestamp(expires_at, datetime.timezone.utc) if expires_at else None),
             httponly=True,  # Ensures the cookie is not accessible via JavaScript
             samesite=WEBUI_AUTH_COOKIE_SAME_SITE,
             secure=WEBUI_AUTH_COOKIE_SECURE,
         )
 
-    user_permissions = get_permissions(
-        user.id, request.app.state.config.USER_PERMISSIONS, db=db
-    )
+    user_permissions = get_permissions(user.id, request.app.state.config.USER_PERMISSIONS, db=db)
     auth = Auths.get_auth_by_id(user.id, db=db)
     has_password = auth.password_login_enabled if auth else True
     password_change_required = auth.password_change_required if auth else False
 
     return {
-        "token": token,
-        "token_type": "Bearer",
-        "expires_at": expires_at,
-        "id": user.id,
-        "email": user.email,
-        "name": user.name,
-        "role": user.role,
-        "profile_image_url": user.profile_image_url,
-        "bio": user.bio,
-        "gender": user.gender,
-        "date_of_birth": user.date_of_birth,
-        "oauth": user.oauth,
-        "presence_state": user.presence_state,
-        "status_emoji": user.status_emoji,
-        "status_message": user.status_message,
-        "status_expires_at": user.status_expires_at,
-        "has_password": has_password,
-        "password_change_required": password_change_required,
-        "permissions": user_permissions,
+        'token': token,
+        'token_type': 'Bearer',
+        'expires_at': expires_at,
+        'id': user.id,
+        'email': user.email,
+        'name': user.name,
+        'role': user.role,
+        'profile_image_url': user.profile_image_url,
+        'bio': user.bio,
+        'gender': user.gender,
+        'date_of_birth': user.date_of_birth,
+        'oauth': user.oauth,
+        'presence_state': user.presence_state,
+        'status_emoji': user.status_emoji,
+        'status_message': user.status_message,
+        'status_expires_at': user.status_expires_at,
+        'has_password': has_password,
+        'password_change_required': password_change_required,
+        'permissions': user_permissions,
     }
 
 
@@ -525,7 +509,7 @@ async def get_session_user(
 ############################
 
 
-@router.post("/update/profile", response_model=UserProfileImageResponse)
+@router.post('/update/profile', response_model=UserProfileImageResponse)
 async def update_profile(
     form_data: UpdateProfileForm,
     session_user=Depends(get_verified_user),
@@ -554,7 +538,7 @@ class UpdateTimezoneForm(BaseModel):
     timezone: str
 
 
-@router.post("/update/timezone")
+@router.post('/update/timezone')
 async def update_timezone(
     form_data: UpdateTimezoneForm,
     session_user=Depends(get_current_user),
@@ -563,10 +547,10 @@ async def update_timezone(
     if session_user:
         Users.update_user_by_id(
             session_user.id,
-            {"timezone": form_data.timezone},
+            {'timezone': form_data.timezone},
             db=db,
         )
-        return {"status": True}
+        return {'status': True}
     else:
         raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
 
@@ -576,7 +560,7 @@ async def update_timezone(
 ############################
 
 
-@router.post("/update/password", response_model=bool)
+@router.post('/update/password', response_model=bool)
 async def update_password(
     form_data: UpdatePasswordForm,
     session_user=Depends(get_current_user),
@@ -624,7 +608,7 @@ async def update_password(
 ############################
 # LDAP Authentication
 ############################
-@router.post("/ldap", response_model=SessionUserResponse)
+@router.post('/ldap', response_model=SessionUserResponse)
 async def ldap_auth(
     request: Request,
     response: Response,
@@ -633,7 +617,7 @@ async def ldap_auth(
 ):
     # Security checks FIRST - before loading any config
     if not request.app.state.config.ENABLE_LDAP:
-        raise HTTPException(400, detail="LDAP authentication is not enabled")
+        raise HTTPException(400, detail='LDAP authentication is not enabled')
 
     if not ENABLE_PASSWORD_AUTH:
         raise HTTPException(
@@ -653,14 +637,8 @@ async def ldap_auth(
     LDAP_APP_PASSWORD = request.app.state.config.LDAP_APP_PASSWORD
     LDAP_USE_TLS = request.app.state.config.LDAP_USE_TLS
     LDAP_CA_CERT_FILE = request.app.state.config.LDAP_CA_CERT_FILE
-    LDAP_VALIDATE_CERT = (
-        CERT_REQUIRED if request.app.state.config.LDAP_VALIDATE_CERT else CERT_NONE
-    )
-    LDAP_CIPHERS = (
-        request.app.state.config.LDAP_CIPHERS
-        if request.app.state.config.LDAP_CIPHERS
-        else "ALL"
-    )
+    LDAP_VALIDATE_CERT = CERT_REQUIRED if request.app.state.config.LDAP_VALIDATE_CERT else CERT_NONE
+    LDAP_CIPHERS = request.app.state.config.LDAP_CIPHERS if request.app.state.config.LDAP_CIPHERS else 'ALL'
 
     try:
         tls = Tls(
@@ -670,8 +648,8 @@ async def ldap_auth(
             ciphers=LDAP_CIPHERS,
         )
     except Exception as e:
-        log.error(f"TLS configuration error: {str(e)}")
-        raise HTTPException(400, detail="Failed to configure TLS for LDAP connection.")
+        log.error(f'TLS configuration error: {str(e)}')
+        raise HTTPException(400, detail='Failed to configure TLS for LDAP connection.')
 
     try:
         server = Server(
@@ -685,44 +663,38 @@ async def ldap_auth(
             server,
             LDAP_APP_DN,
             LDAP_APP_PASSWORD,
-            auto_bind="NONE",
-            authentication="SIMPLE" if LDAP_APP_DN else "ANONYMOUS",
+            auto_bind='NONE',
+            authentication='SIMPLE' if LDAP_APP_DN else 'ANONYMOUS',
         )
         if not await asyncio.to_thread(connection_app.bind):
-            raise HTTPException(400, detail="Application account bind failed")
+            raise HTTPException(400, detail='Application account bind failed')
 
-        ENABLE_LDAP_GROUP_MANAGEMENT = (
-            request.app.state.config.ENABLE_LDAP_GROUP_MANAGEMENT
-        )
+        ENABLE_LDAP_GROUP_MANAGEMENT = request.app.state.config.ENABLE_LDAP_GROUP_MANAGEMENT
         ENABLE_LDAP_GROUP_CREATION = request.app.state.config.ENABLE_LDAP_GROUP_CREATION
         LDAP_ATTRIBUTE_FOR_GROUPS = request.app.state.config.LDAP_ATTRIBUTE_FOR_GROUPS
 
         search_attributes = [
-            f"{LDAP_ATTRIBUTE_FOR_USERNAME}",
-            f"{LDAP_ATTRIBUTE_FOR_MAIL}",
-            "cn",
+            f'{LDAP_ATTRIBUTE_FOR_USERNAME}',
+            f'{LDAP_ATTRIBUTE_FOR_MAIL}',
+            'cn',
         ]
         if ENABLE_LDAP_GROUP_MANAGEMENT:
-            search_attributes.append(f"{LDAP_ATTRIBUTE_FOR_GROUPS}")
-            log.info(
-                f"LDAP Group Management enabled. Adding {LDAP_ATTRIBUTE_FOR_GROUPS} to search attributes"
-            )
-        log.info(f"LDAP search attributes: {search_attributes}")
+            search_attributes.append(f'{LDAP_ATTRIBUTE_FOR_GROUPS}')
+            log.info(f'LDAP Group Management enabled. Adding {LDAP_ATTRIBUTE_FOR_GROUPS} to search attributes')
+        log.info(f'LDAP search attributes: {search_attributes}')
 
         search_success = await asyncio.to_thread(
             connection_app.search,
             search_base=LDAP_SEARCH_BASE,
-            search_filter=f"(&({LDAP_ATTRIBUTE_FOR_USERNAME}={escape_filter_chars(form_data.user.lower())}){LDAP_SEARCH_FILTERS})",
+            search_filter=f'(&({LDAP_ATTRIBUTE_FOR_USERNAME}={escape_filter_chars(form_data.user.lower())}){LDAP_SEARCH_FILTERS})',
             attributes=search_attributes,
         )
         if not search_success or not connection_app.entries:
-            raise HTTPException(400, detail="User not found in the LDAP server")
+            raise HTTPException(400, detail='User not found in the LDAP server')
 
         entry = connection_app.entries[0]
-        entry_username = entry[f"{LDAP_ATTRIBUTE_FOR_USERNAME}"].value
-        email = entry[
-            f"{LDAP_ATTRIBUTE_FOR_MAIL}"
-        ].value  # retrieve the Attribute value
+        entry_username = entry[f'{LDAP_ATTRIBUTE_FOR_USERNAME}'].value
+        email = entry[f'{LDAP_ATTRIBUTE_FOR_MAIL}'].value  # retrieve the Attribute value
 
         username_list = []  # list of usernames from LDAP attribute
         if isinstance(entry_username, list):
@@ -732,7 +704,7 @@ async def ldap_auth(
 
         # TODO: support multiple emails if LDAP returns a list
         if not email:
-            raise HTTPException(400, "User does not have a valid email address.")
+            raise HTTPException(400, 'User does not have a valid email address.')
         elif isinstance(email, str):
             email = email.lower()
         elif isinstance(email, list):
@@ -740,47 +712,43 @@ async def ldap_auth(
         else:
             email = str(email).lower()
 
-        cn = str(entry["cn"])  # common name
+        cn = str(entry['cn'])  # common name
         user_dn = entry.entry_dn  # user distinguished name
 
         user_groups = []
         if ENABLE_LDAP_GROUP_MANAGEMENT and LDAP_ATTRIBUTE_FOR_GROUPS in entry:
             group_dns = entry[LDAP_ATTRIBUTE_FOR_GROUPS]
-            log.info(f"LDAP raw group DNs for user {username_list}: {group_dns}")
+            log.info(f'LDAP raw group DNs for user {username_list}: {group_dns}')
 
             if group_dns:
-                log.info(f"LDAP group_dns original: {group_dns}")
-                log.info(f"LDAP group_dns type: {type(group_dns)}")
-                log.info(f"LDAP group_dns length: {len(group_dns)}")
+                log.info(f'LDAP group_dns original: {group_dns}')
+                log.info(f'LDAP group_dns type: {type(group_dns)}')
+                log.info(f'LDAP group_dns length: {len(group_dns)}')
 
-                if hasattr(group_dns, "value"):
+                if hasattr(group_dns, 'value'):
                     group_dns = group_dns.value
-                    log.info(f"Extracted .value property: {group_dns}")
-                elif hasattr(group_dns, "__iter__") and not isinstance(
-                    group_dns, (str, bytes)
-                ):
+                    log.info(f'Extracted .value property: {group_dns}')
+                elif hasattr(group_dns, '__iter__') and not isinstance(group_dns, (str, bytes)):
                     group_dns = list(group_dns)
-                    log.info(f"Converted to list: {group_dns}")
+                    log.info(f'Converted to list: {group_dns}')
 
                 if isinstance(group_dns, list):
                     group_dns = [str(item) for item in group_dns]
                 else:
                     group_dns = [str(group_dns)]
 
-                log.info(
-                    f"LDAP group_dns after processing - type: {type(group_dns)}, length: {len(group_dns)}"
-                )
+                log.info(f'LDAP group_dns after processing - type: {type(group_dns)}, length: {len(group_dns)}')
 
                 for group_idx, group_dn in enumerate(group_dns):
                     group_dn = str(group_dn)
-                    log.info(f"Processing group DN #{group_idx + 1}: {group_dn}")
+                    log.info(f'Processing group DN #{group_idx + 1}: {group_dn}')
 
                     try:
                         group_cn = None
 
-                        for item in group_dn.split(","):
+                        for item in group_dn.split(','):
                             item = item.strip()
-                            if item.upper().startswith("CN="):
+                            if item.upper().startswith('CN='):
                                 group_cn = item[3:]
                                 break
 
@@ -788,22 +756,16 @@ async def ldap_auth(
                             user_groups.append(group_cn)
 
                         else:
-                            log.warning(
-                                f"Could not extract CN from group DN: {group_dn}"
-                            )
+                            log.warning(f'Could not extract CN from group DN: {group_dn}')
                     except Exception as e:
-                        log.warning(
-                            f"Failed to extract group name from DN {group_dn}: {e}"
-                        )
+                        log.warning(f'Failed to extract group name from DN {group_dn}: {e}')
 
-                log.info(
-                    f"LDAP groups for user {username_list}: {user_groups} (total: {len(user_groups)})"
-                )
+                log.info(f'LDAP groups for user {username_list}: {user_groups} (total: {len(user_groups)})')
             else:
-                log.info(f"No groups found for user {username_list}")
+                log.info(f'No groups found for user {username_list}')
         elif ENABLE_LDAP_GROUP_MANAGEMENT:
             log.warning(
-                f"LDAP Group Management enabled but {LDAP_ATTRIBUTE_FOR_GROUPS} attribute not found in user entry"
+                f'LDAP Group Management enabled but {LDAP_ATTRIBUTE_FOR_GROUPS} attribute not found in user entry'
             )
 
         if username_list and form_data.user.lower() in username_list:
@@ -811,20 +773,16 @@ async def ldap_auth(
                 server,
                 user_dn,
                 form_data.password,
-                auto_bind="NONE",
-                authentication="SIMPLE",
+                auto_bind='NONE',
+                authentication='SIMPLE',
             )
             if not await asyncio.to_thread(connection_user.bind):
-                raise HTTPException(400, "Authentication failed.")
+                raise HTTPException(400, 'Authentication failed.')
 
             user = Users.get_user_by_email(email, db=db)
             if not user:
                 try:
-                    role = (
-                        "admin"
-                        if not Users.has_users(db=db)
-                        else request.app.state.config.DEFAULT_USER_ROLE
-                    )
+                    role = 'admin' if not Users.has_users(db=db) else request.app.state.config.DEFAULT_USER_ROLE
 
                     user = Auths.insert_new_auth(
                         email=email,
@@ -835,9 +793,7 @@ async def ldap_auth(
                     )
 
                     if not user:
-                        raise HTTPException(
-                            500, detail=ERROR_MESSAGES.CREATE_USER_ERROR
-                        )
+                        raise HTTPException(500, detail=ERROR_MESSAGES.CREATE_USER_ERROR)
 
                     apply_default_group_assignment(
                         request.app.state.config.DEFAULT_GROUP_ID,
@@ -848,39 +804,29 @@ async def ldap_auth(
                 except HTTPException:
                     raise
                 except Exception as err:
-                    log.error(f"LDAP user creation error: {str(err)}")
-                    raise HTTPException(
-                        500, detail="Internal error occurred during LDAP user creation."
-                    )
+                    log.error(f'LDAP user creation error: {str(err)}')
+                    raise HTTPException(500, detail='Internal error occurred during LDAP user creation.')
 
             user = Auths.authenticate_user_by_email(email, db=db)
 
             if user:
-                if (
-                    user.role != "admin"
-                    and ENABLE_LDAP_GROUP_MANAGEMENT
-                    and user_groups
-                ):
+                if user.role != 'admin' and ENABLE_LDAP_GROUP_MANAGEMENT and user_groups:
                     if ENABLE_LDAP_GROUP_CREATION:
                         Groups.create_groups_by_group_names(user.id, user_groups, db=db)
                     try:
                         Groups.sync_groups_by_group_names(user.id, user_groups, db=db)
-                        log.info(
-                            f"Successfully synced groups for user {user.id}: {user_groups}"
-                        )
+                        log.info(f'Successfully synced groups for user {user.id}: {user_groups}')
                     except Exception as e:
-                        log.error(f"Failed to sync groups for user {user.id}: {e}")
+                        log.error(f'Failed to sync groups for user {user.id}: {e}')
 
-                return create_session_response(
-                    request, user, db, response, set_cookie=True
-                )
+                return create_session_response(request, user, db, response, set_cookie=True)
             else:
                 raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
         else:
-            raise HTTPException(400, "User record mismatch.")
+            raise HTTPException(400, 'User record mismatch.')
     except Exception as e:
-        log.error(f"LDAP authentication error: {str(e)}")
-        raise HTTPException(400, detail="LDAP authentication failed.")
+        log.error(f'LDAP authentication error: {str(e)}')
+        raise HTTPException(400, detail='LDAP authentication failed.')
 
 
 ############################
@@ -888,7 +834,7 @@ async def ldap_auth(
 ############################
 
 
-@router.post("/signin", response_model=SessionUserResponse)
+@router.post('/signin', response_model=SessionUserResponse)
 async def signin(
     request: Request,
     response: Response,
@@ -911,7 +857,7 @@ async def signin(
         if WEBUI_AUTH_TRUSTED_NAME_HEADER:
             name = request.headers.get(WEBUI_AUTH_TRUSTED_NAME_HEADER, email)
             try:
-                name = urllib.parse.unquote(name, encoding="utf-8")
+                name = urllib.parse.unquote(name, encoding='utf-8')
             except Exception as e:
                 pass
 
@@ -925,18 +871,16 @@ async def signin(
             )
 
         user = Auths.authenticate_user_by_email(email, db=db)
-        if WEBUI_AUTH_TRUSTED_GROUPS_HEADER and user and user.role != "admin":
-            group_names = request.headers.get(
-                WEBUI_AUTH_TRUSTED_GROUPS_HEADER, ""
-            ).split(",")
+        if WEBUI_AUTH_TRUSTED_GROUPS_HEADER and user and user.role != 'admin':
+            group_names = request.headers.get(WEBUI_AUTH_TRUSTED_GROUPS_HEADER, '').split(',')
             group_names = [name.strip() for name in group_names if name.strip()]
 
             if group_names:
                 Groups.sync_groups_by_group_names(user.id, group_names, db=db)
 
     elif WEBUI_AUTH == False:
-        admin_email = "admin@localhost"
-        admin_password = "admin"
+        admin_email = 'admin@localhost'
+        admin_password = 'admin'
 
         if Users.get_user_by_email(admin_email.lower(), db=db):
             user = Auths.authenticate_user(
@@ -952,7 +896,7 @@ async def signin(
                 request,
                 admin_email,
                 admin_password,
-                "User",
+                'User',
                 db=db,
             )
 
@@ -968,14 +912,14 @@ async def signin(
                 detail=ERROR_MESSAGES.RATE_LIMIT_EXCEEDED,
             )
 
-        password_bytes = form_data.password.encode("utf-8")
+        password_bytes = form_data.password.encode('utf-8')
         if len(password_bytes) > 72:
             # TODO: Implement other hashing algorithms that support longer passwords
-            log.info("Password too long, truncating to 72 bytes for bcrypt")
+            log.info('Password too long, truncating to 72 bytes for bcrypt')
             password_bytes = password_bytes[:72]
 
             # decode safely — ignore incomplete UTF-8 sequences
-            form_data.password = password_bytes.decode("utf-8", errors="ignore")
+            form_data.password = password_bytes.decode('utf-8', errors='ignore')
 
         user = Auths.authenticate_user(
             form_data.email.lower(),
@@ -999,7 +943,7 @@ async def signup_handler(
     email: str,
     password: str,
     name: str,
-    profile_image_url: str = "/user.png",
+    profile_image_url: str = '/user.png',
     *,
     db: Session,
 ) -> UserModel:
@@ -1029,7 +973,7 @@ async def signup_handler(
     # Atomically check if this is the only user *after* the insert.
     # Only the single user present at this point should become admin.
     if Users.get_num_users(db=db) == 1:
-        Users.update_user_role_by_id(user.id, "admin", db=db)
+        Users.update_user_role_by_id(user.id, 'admin', db=db)
         user = Users.get_user_by_id(user.id, db=db)
         request.app.state.config.ENABLE_SIGNUP = False
 
@@ -1039,9 +983,9 @@ async def signup_handler(
             request.app.state.config.WEBHOOK_URL,
             WEBHOOK_MESSAGES.USER_SIGNUP(user.name),
             {
-                "action": "signup",
-                "message": WEBHOOK_MESSAGES.USER_SIGNUP(user.name),
-                "user": user.model_dump_json(exclude_none=True),
+                'action': 'signup',
+                'message': WEBHOOK_MESSAGES.USER_SIGNUP(user.name),
+                'user': user.model_dump_json(exclude_none=True),
             },
         )
 
@@ -1054,7 +998,7 @@ async def signup_handler(
     return user
 
 
-@router.post("/signup", response_model=SessionUserResponse)
+@router.post('/signup', response_model=SessionUserResponse)
 async def signup(
     request: Request,
     response: Response,
@@ -1064,30 +1008,19 @@ async def signup(
     has_users = Users.has_users(db=db)
 
     if WEBUI_AUTH:
-        if (
-            not request.app.state.config.ENABLE_SIGNUP
-            or not request.app.state.config.ENABLE_LOGIN_FORM
-        ):
+        if not request.app.state.config.ENABLE_SIGNUP or not request.app.state.config.ENABLE_LOGIN_FORM:
             if has_users or not ENABLE_INITIAL_ADMIN_SIGNUP:
-                raise HTTPException(
-                    status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.ACCESS_PROHIBITED
-                )
+                raise HTTPException(status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.ACCESS_PROHIBITED)
 
         if not request.app.state.config.ENABLE_PASSWORD_SIGNUP:
             if has_users or not ENABLE_INITIAL_ADMIN_SIGNUP:
-                raise HTTPException(
-                    status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.ACCESS_PROHIBITED
-                )
+                raise HTTPException(status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.ACCESS_PROHIBITED)
     else:
         if has_users:
-            raise HTTPException(
-                status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.ACCESS_PROHIBITED
-            )
+            raise HTTPException(status.HTTP_403_FORBIDDEN, detail=ERROR_MESSAGES.ACCESS_PROHIBITED)
 
     if not validate_email_format(form_data.email.lower()):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.INVALID_EMAIL_FORMAT
-        )
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.INVALID_EMAIL_FORMAT)
 
     if Users.get_user_by_email(form_data.email.lower(), db=db):
         raise HTTPException(400, detail=ERROR_MESSAGES.EMAIL_TAKEN)
@@ -1119,34 +1052,32 @@ async def signup(
     except HTTPException:
         raise
     except Exception as err:
-        log.error(f"Signup error: {str(err)}")
-        raise HTTPException(500, detail="An internal error occurred during signup.")
+        log.error(f'Signup error: {str(err)}')
+        raise HTTPException(500, detail='An internal error occurred during signup.')
 
 
-@router.get("/signout")
-async def signout(
-    request: Request, response: Response, db: Session = Depends(get_session)
-):
+@router.get('/signout')
+async def signout(request: Request, response: Response, db: Session = Depends(get_session)):
 
     # get auth token from headers or cookies
     token = None
-    auth_header = request.headers.get("Authorization")
+    auth_header = request.headers.get('Authorization')
     if auth_header:
         auth_cred = get_http_authorization_cred(auth_header)
         token = auth_cred.credentials
     else:
-        token = request.cookies.get("token")
+        token = request.cookies.get('token')
 
     if token:
         await invalidate_token(request, token)
 
-    response.delete_cookie("token")
-    response.delete_cookie("oui-session")
-    response.delete_cookie("oauth_id_token")
+    response.delete_cookie('token')
+    response.delete_cookie('oui-session')
+    response.delete_cookie('oauth_id_token')
 
-    oauth_session_id = request.cookies.get("oauth_session_id")
+    oauth_session_id = request.cookies.get('oauth_session_id')
     if oauth_session_id:
-        response.delete_cookie("oauth_session_id")
+        response.delete_cookie('oauth_session_id')
 
         session = OAuthSessions.get_session_by_id(oauth_session_id, db=db)
 
@@ -1154,49 +1085,47 @@ async def signout(
             return JSONResponse(
                 status_code=200,
                 content={
-                    "status": True,
-                    "redirect_url": OPENID_END_SESSION_ENDPOINT.value,
+                    'status': True,
+                    'redirect_url': OPENID_END_SESSION_ENDPOINT.value,
                 },
                 headers=response.headers,
             )
 
         oauth_server_metadata_url = (
-            request.app.state.oauth_manager.get_server_metadata_url(session.provider)
-            if session
-            else None
+            request.app.state.oauth_manager.get_server_metadata_url(session.provider) if session else None
         ) or OPENID_PROVIDER_URL.value
 
         if session and oauth_server_metadata_url:
-            oauth_id_token = session.token.get("id_token")
+            oauth_id_token = session.token.get('id_token')
             try:
                 async with ClientSession(trust_env=True) as session:
                     async with session.get(oauth_server_metadata_url) as r:
                         if r.status == 200:
                             openid_data = await r.json()
-                            logout_url = openid_data.get("end_session_endpoint")
+                            logout_url = openid_data.get('end_session_endpoint')
 
                             if logout_url:
                                 return JSONResponse(
                                     status_code=200,
                                     content={
-                                        "status": True,
-                                        "redirect_url": f"{logout_url}?id_token_hint={oauth_id_token}"
+                                        'status': True,
+                                        'redirect_url': f'{logout_url}?id_token_hint={oauth_id_token}'
                                         + (
-                                            f"&post_logout_redirect_uri={WEBUI_AUTH_SIGNOUT_REDIRECT_URL}"
+                                            f'&post_logout_redirect_uri={WEBUI_AUTH_SIGNOUT_REDIRECT_URL}'
                                             if WEBUI_AUTH_SIGNOUT_REDIRECT_URL
-                                            else ""
+                                            else ''
                                         ),
                                     },
                                     headers=response.headers,
                                 )
                         else:
-                            raise Exception("Failed to fetch OpenID configuration")
+                            raise Exception('Failed to fetch OpenID configuration')
 
             except Exception as e:
-                log.error(f"OpenID signout error: {str(e)}")
+                log.error(f'OpenID signout error: {str(e)}')
                 raise HTTPException(
                     status_code=500,
-                    detail="Failed to sign out from the OpenID provider.",
+                    detail='Failed to sign out from the OpenID provider.',
                     headers=response.headers,
                 )
 
@@ -1204,15 +1133,13 @@ async def signout(
         return JSONResponse(
             status_code=200,
             content={
-                "status": True,
-                "redirect_url": WEBUI_AUTH_SIGNOUT_REDIRECT_URL,
+                'status': True,
+                'redirect_url': WEBUI_AUTH_SIGNOUT_REDIRECT_URL,
             },
             headers=response.headers,
         )
 
-    return JSONResponse(
-        status_code=200, content={"status": True}, headers=response.headers
-    )
+    return JSONResponse(status_code=200, content={'status': True}, headers=response.headers)
 
 
 ############################
@@ -1220,7 +1147,7 @@ async def signout(
 ############################
 
 
-@router.post("/add", response_model=SigninResponse)
+@router.post('/add', response_model=SigninResponse)
 async def add_user(
     request: Request,
     form_data: AddUserForm,
@@ -1228,9 +1155,7 @@ async def add_user(
     db: Session = Depends(get_session),
 ):
     if not validate_email_format(form_data.email.lower()):
-        raise HTTPException(
-            status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.INVALID_EMAIL_FORMAT
-        )
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.INVALID_EMAIL_FORMAT)
 
     if Users.get_user_by_email(form_data.email.lower(), db=db):
         raise HTTPException(400, detail=ERROR_MESSAGES.EMAIL_TAKEN)
@@ -1258,25 +1183,23 @@ async def add_user(
                 db=db,
             )
 
-            token = create_token(data={"id": user.id})
+            token = create_token(data={'id': user.id})
             return {
-                "token": token,
-                "token_type": "Bearer",
-                "id": user.id,
-                "email": user.email,
-                "name": user.name,
-                "role": user.role,
-                "profile_image_url": f"/api/v1/users/{user.id}/profile/image",
+                'token': token,
+                'token_type': 'Bearer',
+                'id': user.id,
+                'email': user.email,
+                'name': user.name,
+                'role': user.role,
+                'profile_image_url': f'/api/v1/users/{user.id}/profile/image',
             }
         else:
             raise HTTPException(500, detail=ERROR_MESSAGES.CREATE_USER_ERROR)
     except HTTPException:
         raise
     except Exception as err:
-        log.error(f"Add user error: {str(err)}")
-        raise HTTPException(
-            500, detail="An internal error occurred while adding the user."
-        )
+        log.error(f'Add user error: {str(err)}')
+        raise HTTPException(500, detail='An internal error occurred while adding the user.')
 
 
 ############################
@@ -1284,15 +1207,13 @@ async def add_user(
 ############################
 
 
-@router.get("/admin/details")
-async def get_admin_details(
-    request: Request, user=Depends(get_current_user), db: Session = Depends(get_session)
-):
+@router.get('/admin/details')
+async def get_admin_details(request: Request, user=Depends(get_current_user), db: Session = Depends(get_session)):
     if request.app.state.config.SHOW_ADMIN_DETAILS:
         admin_email = request.app.state.config.ADMIN_EMAIL
         admin_name = None
 
-        log.info(f"Admin details - Email: {admin_email}, Name: {admin_name}")
+        log.info(f'Admin details - Email: {admin_email}, Name: {admin_name}')
 
         if admin_email:
             admin = Users.get_user_by_email(admin_email, db=db)
@@ -1305,8 +1226,8 @@ async def get_admin_details(
                 admin_name = admin.name
 
         return {
-            "name": admin_name,
-            "email": admin_email,
+            'name': admin_name,
+            'email': admin_email,
         }
     else:
         raise HTTPException(400, detail=ERROR_MESSAGES.ACTION_PROHIBITED)
@@ -1317,28 +1238,26 @@ async def get_admin_details(
 ############################
 
 
-@router.get("/admin/config")
+@router.get('/admin/config')
 async def get_admin_config(request: Request, user=Depends(get_admin_user)):
     return _serialize_admin_config(request)
 
 
-@router.get("/invites")
+@router.get('/invites')
 async def get_invite_codes(
     request: Request,
     user=Depends(get_verified_user),
 ):
-    return {"items": get_invite_codes_for_user(user, request.app.state.config)}
+    return {'items': get_invite_codes_for_user(user, request.app.state.config)}
 
 
-@router.post("/invites")
+@router.post('/invites')
 async def issue_invite_code(
     request: Request,
     user=Depends(get_verified_user),
     db: Session = Depends(get_session),
 ):
-    can_create, reason, _ = can_user_create_invite_codes(
-        user, request.app.state.config, db=db
-    )
+    can_create, reason, _ = can_user_create_invite_codes(user, request.app.state.config, db=db)
     if not can_create:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1351,11 +1270,11 @@ async def issue_invite_code(
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create invite code.",
+            detail='Failed to create invite code.',
         )
 
 
-@router.delete("/invites/{invite_id}")
+@router.delete('/invites/{invite_id}')
 async def delete_invite_code(
     invite_id: str,
     request: Request,
@@ -1368,21 +1287,19 @@ async def delete_invite_code(
         if not isinstance(invite, dict):
             continue
 
-        if user.role != "admin" and invite.get("created_by") != user.id:
+        if user.role != 'admin' and invite.get('created_by') != user.id:
             continue
 
-        if invite.get("id") == invite_id or str(invite.get("code", "")).lower() == invite_id.lower():
+        if invite.get('id') == invite_id or str(invite.get('code', '')).lower() == invite_id.lower():
             match_idx = idx
             break
 
     if match_idx is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Invite code not found."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Invite code not found.')
 
     all_invite_codes.pop(match_idx)
     request.app.state.config.INVITE_CODES = all_invite_codes
-    return {"status": True}
+    return {'status': True}
 
 
 class AdminConfig(BaseModel):
@@ -1396,88 +1313,88 @@ class AdminConfig(BaseModel):
     OAUTH_ALLOWED_LOGIN_PROVIDERS: Optional[List[str]] = None
     OAUTH_ALLOWED_SIGNUP_PROVIDERS: Optional[List[str]] = None
     OAUTH_MERGE_ACCOUNTS_BY_EMAIL: bool = False
-    OAUTH_TIMEOUT: str = ""
-    OAUTH_AUDIENCE: str = ""
+    OAUTH_TIMEOUT: str = ''
+    OAUTH_AUDIENCE: str = ''
     GOOGLE_OAUTH_ENABLED: bool = True
-    GOOGLE_CLIENT_ID: str = ""
-    GOOGLE_CLIENT_SECRET: str = ""
-    GOOGLE_OAUTH_SCOPE: str = "openid email profile"
-    GOOGLE_SERVER_METADATA_URL: str = "https://accounts.google.com/.well-known/openid-configuration"
-    GOOGLE_REDIRECT_URI: str = ""
+    GOOGLE_CLIENT_ID: str = ''
+    GOOGLE_CLIENT_SECRET: str = ''
+    GOOGLE_OAUTH_SCOPE: str = 'openid email profile'
+    GOOGLE_SERVER_METADATA_URL: str = 'https://accounts.google.com/.well-known/openid-configuration'
+    GOOGLE_REDIRECT_URI: str = ''
     MICROSOFT_OAUTH_ENABLED: bool = True
-    MICROSOFT_CLIENT_ID: str = ""
-    MICROSOFT_CLIENT_SECRET: str = ""
-    MICROSOFT_CLIENT_TENANT_ID: str = ""
-    MICROSOFT_CLIENT_LOGIN_BASE_URL: str = "https://login.microsoftonline.com"
-    MICROSOFT_CLIENT_PICTURE_URL: str = "https://graph.microsoft.com/v1.0/me/photo/$value"
-    MICROSOFT_OAUTH_SCOPE: str = "openid email profile"
-    MICROSOFT_REDIRECT_URI: str = ""
+    MICROSOFT_CLIENT_ID: str = ''
+    MICROSOFT_CLIENT_SECRET: str = ''
+    MICROSOFT_CLIENT_TENANT_ID: str = ''
+    MICROSOFT_CLIENT_LOGIN_BASE_URL: str = 'https://login.microsoftonline.com'
+    MICROSOFT_CLIENT_PICTURE_URL: str = 'https://graph.microsoft.com/v1.0/me/photo/$value'
+    MICROSOFT_OAUTH_SCOPE: str = 'openid email profile'
+    MICROSOFT_REDIRECT_URI: str = ''
     GITHUB_OAUTH_ENABLED: bool = True
-    GITHUB_CLIENT_ID: str = ""
-    GITHUB_CLIENT_SECRET: str = ""
-    GITHUB_CLIENT_SCOPE: str = "user:email"
-    GITHUB_CLIENT_REDIRECT_URI: str = ""
-    GITHUB_ACCESS_TOKEN_URL: str = "https://github.com/login/oauth/access_token"
-    GITHUB_AUTHORIZE_URL: str = "https://github.com/login/oauth/authorize"
-    GITHUB_API_BASE_URL: str = "https://api.github.com"
-    GITHUB_USERINFO_ENDPOINT: str = "https://api.github.com/user"
+    GITHUB_CLIENT_ID: str = ''
+    GITHUB_CLIENT_SECRET: str = ''
+    GITHUB_CLIENT_SCOPE: str = 'user:email'
+    GITHUB_CLIENT_REDIRECT_URI: str = ''
+    GITHUB_ACCESS_TOKEN_URL: str = 'https://github.com/login/oauth/access_token'
+    GITHUB_AUTHORIZE_URL: str = 'https://github.com/login/oauth/authorize'
+    GITHUB_API_BASE_URL: str = 'https://api.github.com'
+    GITHUB_USERINFO_ENDPOINT: str = 'https://api.github.com/user'
     OIDC_OAUTH_ENABLED: bool = True
-    OAUTH_PROVIDER_NAME: str = "SSO"
-    OAUTH_CLIENT_ID: str = ""
-    OAUTH_CLIENT_SECRET: str = ""
-    OPENID_PROVIDER_URL: str = ""
-    OPENID_REDIRECT_URI: str = ""
-    OAUTH_SCOPES: str = "openid email profile"
+    OAUTH_PROVIDER_NAME: str = 'SSO'
+    OAUTH_CLIENT_ID: str = ''
+    OAUTH_CLIENT_SECRET: str = ''
+    OPENID_PROVIDER_URL: str = ''
+    OPENID_REDIRECT_URI: str = ''
+    OAUTH_SCOPES: str = 'openid email profile'
     OAUTH_TOKEN_ENDPOINT_AUTH_METHOD: Optional[str] = None
     OAUTH_CODE_CHALLENGE_METHOD: Optional[str] = None
     OAUTH_SUB_CLAIM: Optional[str] = None
-    OAUTH_USERNAME_CLAIM: str = "name"
-    OAUTH_EMAIL_CLAIM: str = "email"
-    OAUTH_PICTURE_CLAIM: str = "picture"
-    OAUTH_GROUPS_CLAIM: str = "groups"
+    OAUTH_USERNAME_CLAIM: str = 'name'
+    OAUTH_EMAIL_CLAIM: str = 'email'
+    OAUTH_PICTURE_CLAIM: str = 'picture'
+    OAUTH_GROUPS_CLAIM: str = 'groups'
     FEISHU_OAUTH_ENABLED: bool = True
-    FEISHU_CLIENT_ID: str = ""
-    FEISHU_CLIENT_SECRET: str = ""
-    FEISHU_OAUTH_SCOPE: str = "contact:user.base:readonly"
-    FEISHU_REDIRECT_URI: str = ""
-    FEISHU_ACCESS_TOKEN_URL: str = "https://open.feishu.cn/open-apis/authen/v2/oauth/token"
-    FEISHU_AUTHORIZE_URL: str = "https://accounts.feishu.cn/open-apis/authen/v1/authorize"
-    FEISHU_API_BASE_URL: str = "https://open.feishu.cn/open-apis"
-    FEISHU_USERINFO_ENDPOINT: str = "https://open.feishu.cn/open-apis/authen/v1/user_info"
+    FEISHU_CLIENT_ID: str = ''
+    FEISHU_CLIENT_SECRET: str = ''
+    FEISHU_OAUTH_SCOPE: str = 'contact:user.base:readonly'
+    FEISHU_REDIRECT_URI: str = ''
+    FEISHU_ACCESS_TOKEN_URL: str = 'https://open.feishu.cn/open-apis/authen/v2/oauth/token'
+    FEISHU_AUTHORIZE_URL: str = 'https://accounts.feishu.cn/open-apis/authen/v1/authorize'
+    FEISHU_API_BASE_URL: str = 'https://open.feishu.cn/open-apis'
+    FEISHU_USERINFO_ENDPOINT: str = 'https://open.feishu.cn/open-apis/authen/v1/user_info'
     DISCORD_OAUTH_ENABLED: bool = True
-    DISCORD_CLIENT_ID: str = ""
-    DISCORD_CLIENT_SECRET: str = ""
-    DISCORD_OAUTH_SCOPE: str = "identify email"
-    DISCORD_REDIRECT_URI: str = ""
-    DISCORD_ACCESS_TOKEN_URL: str = "https://discord.com/api/oauth2/token"
-    DISCORD_AUTHORIZE_URL: str = "https://discord.com/oauth2/authorize"
-    DISCORD_API_BASE_URL: str = "https://discord.com/api"
-    DISCORD_USERINFO_ENDPOINT: str = "https://discord.com/api/users/@me"
+    DISCORD_CLIENT_ID: str = ''
+    DISCORD_CLIENT_SECRET: str = ''
+    DISCORD_OAUTH_SCOPE: str = 'identify email'
+    DISCORD_REDIRECT_URI: str = ''
+    DISCORD_ACCESS_TOKEN_URL: str = 'https://discord.com/api/oauth2/token'
+    DISCORD_AUTHORIZE_URL: str = 'https://discord.com/oauth2/authorize'
+    DISCORD_API_BASE_URL: str = 'https://discord.com/api'
+    DISCORD_USERINFO_ENDPOINT: str = 'https://discord.com/api/users/@me'
     GITLAB_OAUTH_ENABLED: bool = True
-    GITLAB_CLIENT_ID: str = ""
-    GITLAB_CLIENT_SECRET: str = ""
-    GITLAB_OAUTH_SCOPE: str = "openid profile email"
-    GITLAB_REDIRECT_URI: str = ""
-    GITLAB_ACCESS_TOKEN_URL: str = "https://gitlab.com/oauth/token"
-    GITLAB_AUTHORIZE_URL: str = "https://gitlab.com/oauth/authorize"
-    GITLAB_API_BASE_URL: str = "https://gitlab.com/api/v4"
-    GITLAB_USERINFO_ENDPOINT: str = "https://gitlab.com/oauth/userinfo"
+    GITLAB_CLIENT_ID: str = ''
+    GITLAB_CLIENT_SECRET: str = ''
+    GITLAB_OAUTH_SCOPE: str = 'openid profile email'
+    GITLAB_REDIRECT_URI: str = ''
+    GITLAB_ACCESS_TOKEN_URL: str = 'https://gitlab.com/oauth/token'
+    GITLAB_AUTHORIZE_URL: str = 'https://gitlab.com/oauth/authorize'
+    GITLAB_API_BASE_URL: str = 'https://gitlab.com/api/v4'
+    GITLAB_USERINFO_ENDPOINT: str = 'https://gitlab.com/oauth/userinfo'
     SLACK_OAUTH_ENABLED: bool = True
-    SLACK_CLIENT_ID: str = ""
-    SLACK_CLIENT_SECRET: str = ""
-    SLACK_OAUTH_SCOPE: str = "openid profile email"
-    SLACK_REDIRECT_URI: str = ""
-    SLACK_ACCESS_TOKEN_URL: str = "https://slack.com/api/openid.connect.token"
-    SLACK_AUTHORIZE_URL: str = "https://slack.com/openid/connect/authorize"
-    SLACK_API_BASE_URL: str = "https://slack.com/api"
-    SLACK_USERINFO_ENDPOINT: str = "https://slack.com/api/openid.connect.userInfo"
+    SLACK_CLIENT_ID: str = ''
+    SLACK_CLIENT_SECRET: str = ''
+    SLACK_OAUTH_SCOPE: str = 'openid profile email'
+    SLACK_REDIRECT_URI: str = ''
+    SLACK_ACCESS_TOKEN_URL: str = 'https://slack.com/api/openid.connect.token'
+    SLACK_AUTHORIZE_URL: str = 'https://slack.com/openid/connect/authorize'
+    SLACK_API_BASE_URL: str = 'https://slack.com/api'
+    SLACK_USERINFO_ENDPOINT: str = 'https://slack.com/api/openid.connect.userInfo'
     ENABLE_INVITE_ONLY_AUTH: bool = False
-    INVITE_CREATOR_SCOPE: str = "admin"
+    INVITE_CREATOR_SCOPE: str = 'admin'
     INVITE_CREATOR_GROUP_IDS: List[str] = Field(default_factory=list)
     INVITE_CREATOR_COOLDOWN_SECONDS: int = 3600
     INVITE_CODE_LENGTH: int = 8
     INVITE_CODE_TTL_SECONDS: int = 604800
-    INVITE_CODE_PREFIX: str = ""
+    INVITE_CODE_PREFIX: str = ''
     INVITE_CODE_REUSABLE: bool = False
     INVITE_CODE_MAX_USES: int = 1
     ENABLE_API_KEYS: bool
@@ -1496,11 +1413,11 @@ class AdminConfig(BaseModel):
     ENABLE_USER_WEBHOOKS: bool
     ENABLE_USER_STATUS: bool
     ENABLE_SYSTEM_NOTICE: bool = False
-    SYSTEM_NOTICE_TITLE: Optional[str] = "System Notice"
-    SYSTEM_NOTICE_CONTENT: Optional[str] = ""
+    SYSTEM_NOTICE_TITLE: Optional[str] = 'System Notice'
+    SYSTEM_NOTICE_CONTENT: Optional[str] = ''
     ENABLE_MOTD: bool = False
-    MOTD_TITLE: Optional[str] = "Message of the day!"
-    MOTD_CONTENT: Optional[str] = ""
+    MOTD_TITLE: Optional[str] = 'Message of the day!'
+    MOTD_CONTENT: Optional[str] = ''
     NOTIFICATION_SOUND_LIBRARY: List[dict] = Field(default_factory=list)
     CUSTOM_EMOJI_LIBRARY: List[dict] = Field(default_factory=list)
     PENDING_USER_OVERLAY_TITLE: Optional[str] = None
@@ -1508,10 +1425,8 @@ class AdminConfig(BaseModel):
     RESPONSE_WATERMARK: Optional[str] = None
 
 
-@router.post("/admin/config")
-async def update_admin_config(
-    request: Request, form_data: AdminConfig, user=Depends(get_admin_user)
-):
+@router.post('/admin/config')
+async def update_admin_config(request: Request, form_data: AdminConfig, user=Depends(get_admin_user)):
     request.app.state.config.SHOW_ADMIN_DETAILS = form_data.SHOW_ADMIN_DETAILS
     request.app.state.config.ADMIN_EMAIL = form_data.ADMIN_EMAIL
     request.app.state.config.WEBUI_URL = form_data.WEBUI_URL
@@ -1519,234 +1434,104 @@ async def update_admin_config(
     request.app.state.config.ENABLE_PASSWORD_SIGNUP = form_data.ENABLE_PASSWORD_SIGNUP
     request.app.state.config.ENABLE_OAUTH_LOGIN = form_data.ENABLE_OAUTH_LOGIN
     request.app.state.config.ENABLE_OAUTH_SIGNUP = form_data.ENABLE_OAUTH_SIGNUP
-    request.app.state.config.OAUTH_MERGE_ACCOUNTS_BY_EMAIL = (
-        form_data.OAUTH_MERGE_ACCOUNTS_BY_EMAIL
-    )
-    request.app.state.config.OAUTH_TIMEOUT = _sanitize_oauth_timeout(
-        form_data.OAUTH_TIMEOUT
-    )
-    request.app.state.config.OAUTH_AUDIENCE = _sanitize_text(
-        form_data.OAUTH_AUDIENCE, 256
-    )
+    request.app.state.config.OAUTH_MERGE_ACCOUNTS_BY_EMAIL = form_data.OAUTH_MERGE_ACCOUNTS_BY_EMAIL
+    request.app.state.config.OAUTH_TIMEOUT = _sanitize_oauth_timeout(form_data.OAUTH_TIMEOUT)
+    request.app.state.config.OAUTH_AUDIENCE = _sanitize_text(form_data.OAUTH_AUDIENCE, 256)
 
     request.app.state.config.GOOGLE_OAUTH_ENABLED = form_data.GOOGLE_OAUTH_ENABLED
-    request.app.state.config.GOOGLE_CLIENT_ID = _sanitize_text(
-        form_data.GOOGLE_CLIENT_ID, 512
-    )
-    request.app.state.config.GOOGLE_CLIENT_SECRET = _sanitize_text(
-        form_data.GOOGLE_CLIENT_SECRET, 1024
-    )
-    request.app.state.config.GOOGLE_OAUTH_SCOPE = _sanitize_text(
-        form_data.GOOGLE_OAUTH_SCOPE, 512
-    )
-    request.app.state.config.GOOGLE_SERVER_METADATA_URL = _sanitize_text(
-        form_data.GOOGLE_SERVER_METADATA_URL, 1024
-    )
-    request.app.state.config.GOOGLE_REDIRECT_URI = _sanitize_text(
-        form_data.GOOGLE_REDIRECT_URI, 1024
-    )
+    request.app.state.config.GOOGLE_CLIENT_ID = _sanitize_text(form_data.GOOGLE_CLIENT_ID, 512)
+    request.app.state.config.GOOGLE_CLIENT_SECRET = _sanitize_text(form_data.GOOGLE_CLIENT_SECRET, 1024)
+    request.app.state.config.GOOGLE_OAUTH_SCOPE = _sanitize_text(form_data.GOOGLE_OAUTH_SCOPE, 512)
+    request.app.state.config.GOOGLE_SERVER_METADATA_URL = _sanitize_text(form_data.GOOGLE_SERVER_METADATA_URL, 1024)
+    request.app.state.config.GOOGLE_REDIRECT_URI = _sanitize_text(form_data.GOOGLE_REDIRECT_URI, 1024)
 
     request.app.state.config.MICROSOFT_OAUTH_ENABLED = form_data.MICROSOFT_OAUTH_ENABLED
-    request.app.state.config.MICROSOFT_CLIENT_ID = _sanitize_text(
-        form_data.MICROSOFT_CLIENT_ID, 512
-    )
-    request.app.state.config.MICROSOFT_CLIENT_SECRET = _sanitize_text(
-        form_data.MICROSOFT_CLIENT_SECRET, 1024
-    )
-    request.app.state.config.MICROSOFT_CLIENT_TENANT_ID = _sanitize_text(
-        form_data.MICROSOFT_CLIENT_TENANT_ID, 256
-    )
+    request.app.state.config.MICROSOFT_CLIENT_ID = _sanitize_text(form_data.MICROSOFT_CLIENT_ID, 512)
+    request.app.state.config.MICROSOFT_CLIENT_SECRET = _sanitize_text(form_data.MICROSOFT_CLIENT_SECRET, 1024)
+    request.app.state.config.MICROSOFT_CLIENT_TENANT_ID = _sanitize_text(form_data.MICROSOFT_CLIENT_TENANT_ID, 256)
     request.app.state.config.MICROSOFT_CLIENT_LOGIN_BASE_URL = _sanitize_text(
         form_data.MICROSOFT_CLIENT_LOGIN_BASE_URL, 1024
     )
-    request.app.state.config.MICROSOFT_CLIENT_PICTURE_URL = _sanitize_text(
-        form_data.MICROSOFT_CLIENT_PICTURE_URL, 1024
-    )
-    request.app.state.config.MICROSOFT_OAUTH_SCOPE = _sanitize_text(
-        form_data.MICROSOFT_OAUTH_SCOPE, 512
-    )
-    request.app.state.config.MICROSOFT_REDIRECT_URI = _sanitize_text(
-        form_data.MICROSOFT_REDIRECT_URI, 1024
-    )
+    request.app.state.config.MICROSOFT_CLIENT_PICTURE_URL = _sanitize_text(form_data.MICROSOFT_CLIENT_PICTURE_URL, 1024)
+    request.app.state.config.MICROSOFT_OAUTH_SCOPE = _sanitize_text(form_data.MICROSOFT_OAUTH_SCOPE, 512)
+    request.app.state.config.MICROSOFT_REDIRECT_URI = _sanitize_text(form_data.MICROSOFT_REDIRECT_URI, 1024)
 
     request.app.state.config.GITHUB_OAUTH_ENABLED = form_data.GITHUB_OAUTH_ENABLED
-    request.app.state.config.GITHUB_CLIENT_ID = _sanitize_text(
-        form_data.GITHUB_CLIENT_ID, 512
-    )
-    request.app.state.config.GITHUB_CLIENT_SECRET = _sanitize_text(
-        form_data.GITHUB_CLIENT_SECRET, 1024
-    )
-    request.app.state.config.GITHUB_CLIENT_SCOPE = _sanitize_text(
-        form_data.GITHUB_CLIENT_SCOPE, 512
-    )
-    request.app.state.config.GITHUB_CLIENT_REDIRECT_URI = _sanitize_text(
-        form_data.GITHUB_CLIENT_REDIRECT_URI, 1024
-    )
-    request.app.state.config.GITHUB_ACCESS_TOKEN_URL = _sanitize_text(
-        form_data.GITHUB_ACCESS_TOKEN_URL, 1024
-    )
-    request.app.state.config.GITHUB_AUTHORIZE_URL = _sanitize_text(
-        form_data.GITHUB_AUTHORIZE_URL, 1024
-    )
-    request.app.state.config.GITHUB_API_BASE_URL = _sanitize_text(
-        form_data.GITHUB_API_BASE_URL, 1024
-    )
-    request.app.state.config.GITHUB_USERINFO_ENDPOINT = _sanitize_text(
-        form_data.GITHUB_USERINFO_ENDPOINT, 1024
-    )
+    request.app.state.config.GITHUB_CLIENT_ID = _sanitize_text(form_data.GITHUB_CLIENT_ID, 512)
+    request.app.state.config.GITHUB_CLIENT_SECRET = _sanitize_text(form_data.GITHUB_CLIENT_SECRET, 1024)
+    request.app.state.config.GITHUB_CLIENT_SCOPE = _sanitize_text(form_data.GITHUB_CLIENT_SCOPE, 512)
+    request.app.state.config.GITHUB_CLIENT_REDIRECT_URI = _sanitize_text(form_data.GITHUB_CLIENT_REDIRECT_URI, 1024)
+    request.app.state.config.GITHUB_ACCESS_TOKEN_URL = _sanitize_text(form_data.GITHUB_ACCESS_TOKEN_URL, 1024)
+    request.app.state.config.GITHUB_AUTHORIZE_URL = _sanitize_text(form_data.GITHUB_AUTHORIZE_URL, 1024)
+    request.app.state.config.GITHUB_API_BASE_URL = _sanitize_text(form_data.GITHUB_API_BASE_URL, 1024)
+    request.app.state.config.GITHUB_USERINFO_ENDPOINT = _sanitize_text(form_data.GITHUB_USERINFO_ENDPOINT, 1024)
 
     request.app.state.config.OIDC_OAUTH_ENABLED = form_data.OIDC_OAUTH_ENABLED
-    request.app.state.config.OAUTH_PROVIDER_NAME = _sanitize_text(
-        form_data.OAUTH_PROVIDER_NAME, 128
+    request.app.state.config.OAUTH_PROVIDER_NAME = _sanitize_text(form_data.OAUTH_PROVIDER_NAME, 128)
+    request.app.state.config.OAUTH_CLIENT_ID = _sanitize_text(form_data.OAUTH_CLIENT_ID, 512)
+    request.app.state.config.OAUTH_CLIENT_SECRET = _sanitize_text(form_data.OAUTH_CLIENT_SECRET, 1024)
+    request.app.state.config.OPENID_PROVIDER_URL = _sanitize_text(form_data.OPENID_PROVIDER_URL, 1024)
+    request.app.state.config.OPENID_REDIRECT_URI = _sanitize_text(form_data.OPENID_REDIRECT_URI, 1024)
+    request.app.state.config.OAUTH_SCOPES = _sanitize_text(form_data.OAUTH_SCOPES, 512)
+    request.app.state.config.OAUTH_TOKEN_ENDPOINT_AUTH_METHOD = (
+        _sanitize_text(form_data.OAUTH_TOKEN_ENDPOINT_AUTH_METHOD, 64) or None
     )
-    request.app.state.config.OAUTH_CLIENT_ID = _sanitize_text(
-        form_data.OAUTH_CLIENT_ID, 512
+    request.app.state.config.OAUTH_CODE_CHALLENGE_METHOD = _sanitize_oauth_code_challenge_method(
+        form_data.OAUTH_CODE_CHALLENGE_METHOD
     )
-    request.app.state.config.OAUTH_CLIENT_SECRET = _sanitize_text(
-        form_data.OAUTH_CLIENT_SECRET, 1024
-    )
-    request.app.state.config.OPENID_PROVIDER_URL = _sanitize_text(
-        form_data.OPENID_PROVIDER_URL, 1024
-    )
-    request.app.state.config.OPENID_REDIRECT_URI = _sanitize_text(
-        form_data.OPENID_REDIRECT_URI, 1024
-    )
-    request.app.state.config.OAUTH_SCOPES = _sanitize_text(
-        form_data.OAUTH_SCOPES, 512
-    )
-    request.app.state.config.OAUTH_TOKEN_ENDPOINT_AUTH_METHOD = _sanitize_text(
-        form_data.OAUTH_TOKEN_ENDPOINT_AUTH_METHOD, 64
-    ) or None
-    request.app.state.config.OAUTH_CODE_CHALLENGE_METHOD = (
-        _sanitize_oauth_code_challenge_method(form_data.OAUTH_CODE_CHALLENGE_METHOD)
-    )
-    request.app.state.config.OAUTH_SUB_CLAIM = _sanitize_text(
-        form_data.OAUTH_SUB_CLAIM, 128
-    ) or None
-    request.app.state.config.OAUTH_USERNAME_CLAIM = _sanitize_text(
-        form_data.OAUTH_USERNAME_CLAIM, 128
-    )
-    request.app.state.config.OAUTH_EMAIL_CLAIM = _sanitize_text(
-        form_data.OAUTH_EMAIL_CLAIM, 128
-    )
-    request.app.state.config.OAUTH_PICTURE_CLAIM = _sanitize_text(
-        form_data.OAUTH_PICTURE_CLAIM, 128
-    )
-    request.app.state.config.OAUTH_GROUPS_CLAIM = _sanitize_text(
-        form_data.OAUTH_GROUPS_CLAIM, 128
-    )
+    request.app.state.config.OAUTH_SUB_CLAIM = _sanitize_text(form_data.OAUTH_SUB_CLAIM, 128) or None
+    request.app.state.config.OAUTH_USERNAME_CLAIM = _sanitize_text(form_data.OAUTH_USERNAME_CLAIM, 128)
+    request.app.state.config.OAUTH_EMAIL_CLAIM = _sanitize_text(form_data.OAUTH_EMAIL_CLAIM, 128)
+    request.app.state.config.OAUTH_PICTURE_CLAIM = _sanitize_text(form_data.OAUTH_PICTURE_CLAIM, 128)
+    request.app.state.config.OAUTH_GROUPS_CLAIM = _sanitize_text(form_data.OAUTH_GROUPS_CLAIM, 128)
 
     request.app.state.config.FEISHU_OAUTH_ENABLED = form_data.FEISHU_OAUTH_ENABLED
-    request.app.state.config.FEISHU_CLIENT_ID = _sanitize_text(
-        form_data.FEISHU_CLIENT_ID, 512
-    )
-    request.app.state.config.FEISHU_CLIENT_SECRET = _sanitize_text(
-        form_data.FEISHU_CLIENT_SECRET, 1024
-    )
-    request.app.state.config.FEISHU_OAUTH_SCOPE = _sanitize_text(
-        form_data.FEISHU_OAUTH_SCOPE, 512
-    )
-    request.app.state.config.FEISHU_REDIRECT_URI = _sanitize_text(
-        form_data.FEISHU_REDIRECT_URI, 1024
-    )
-    request.app.state.config.FEISHU_ACCESS_TOKEN_URL = _sanitize_text(
-        form_data.FEISHU_ACCESS_TOKEN_URL, 1024
-    )
-    request.app.state.config.FEISHU_AUTHORIZE_URL = _sanitize_text(
-        form_data.FEISHU_AUTHORIZE_URL, 1024
-    )
-    request.app.state.config.FEISHU_API_BASE_URL = _sanitize_text(
-        form_data.FEISHU_API_BASE_URL, 1024
-    )
-    request.app.state.config.FEISHU_USERINFO_ENDPOINT = _sanitize_text(
-        form_data.FEISHU_USERINFO_ENDPOINT, 1024
-    )
+    request.app.state.config.FEISHU_CLIENT_ID = _sanitize_text(form_data.FEISHU_CLIENT_ID, 512)
+    request.app.state.config.FEISHU_CLIENT_SECRET = _sanitize_text(form_data.FEISHU_CLIENT_SECRET, 1024)
+    request.app.state.config.FEISHU_OAUTH_SCOPE = _sanitize_text(form_data.FEISHU_OAUTH_SCOPE, 512)
+    request.app.state.config.FEISHU_REDIRECT_URI = _sanitize_text(form_data.FEISHU_REDIRECT_URI, 1024)
+    request.app.state.config.FEISHU_ACCESS_TOKEN_URL = _sanitize_text(form_data.FEISHU_ACCESS_TOKEN_URL, 1024)
+    request.app.state.config.FEISHU_AUTHORIZE_URL = _sanitize_text(form_data.FEISHU_AUTHORIZE_URL, 1024)
+    request.app.state.config.FEISHU_API_BASE_URL = _sanitize_text(form_data.FEISHU_API_BASE_URL, 1024)
+    request.app.state.config.FEISHU_USERINFO_ENDPOINT = _sanitize_text(form_data.FEISHU_USERINFO_ENDPOINT, 1024)
 
     request.app.state.config.DISCORD_OAUTH_ENABLED = form_data.DISCORD_OAUTH_ENABLED
-    request.app.state.config.DISCORD_CLIENT_ID = _sanitize_text(
-        form_data.DISCORD_CLIENT_ID, 512
-    )
-    request.app.state.config.DISCORD_CLIENT_SECRET = _sanitize_text(
-        form_data.DISCORD_CLIENT_SECRET, 1024
-    )
-    request.app.state.config.DISCORD_OAUTH_SCOPE = _sanitize_text(
-        form_data.DISCORD_OAUTH_SCOPE, 512
-    )
-    request.app.state.config.DISCORD_REDIRECT_URI = _sanitize_text(
-        form_data.DISCORD_REDIRECT_URI, 1024
-    )
-    request.app.state.config.DISCORD_ACCESS_TOKEN_URL = _sanitize_text(
-        form_data.DISCORD_ACCESS_TOKEN_URL, 1024
-    )
-    request.app.state.config.DISCORD_AUTHORIZE_URL = _sanitize_text(
-        form_data.DISCORD_AUTHORIZE_URL, 1024
-    )
-    request.app.state.config.DISCORD_API_BASE_URL = _sanitize_text(
-        form_data.DISCORD_API_BASE_URL, 1024
-    )
-    request.app.state.config.DISCORD_USERINFO_ENDPOINT = _sanitize_text(
-        form_data.DISCORD_USERINFO_ENDPOINT, 1024
-    )
+    request.app.state.config.DISCORD_CLIENT_ID = _sanitize_text(form_data.DISCORD_CLIENT_ID, 512)
+    request.app.state.config.DISCORD_CLIENT_SECRET = _sanitize_text(form_data.DISCORD_CLIENT_SECRET, 1024)
+    request.app.state.config.DISCORD_OAUTH_SCOPE = _sanitize_text(form_data.DISCORD_OAUTH_SCOPE, 512)
+    request.app.state.config.DISCORD_REDIRECT_URI = _sanitize_text(form_data.DISCORD_REDIRECT_URI, 1024)
+    request.app.state.config.DISCORD_ACCESS_TOKEN_URL = _sanitize_text(form_data.DISCORD_ACCESS_TOKEN_URL, 1024)
+    request.app.state.config.DISCORD_AUTHORIZE_URL = _sanitize_text(form_data.DISCORD_AUTHORIZE_URL, 1024)
+    request.app.state.config.DISCORD_API_BASE_URL = _sanitize_text(form_data.DISCORD_API_BASE_URL, 1024)
+    request.app.state.config.DISCORD_USERINFO_ENDPOINT = _sanitize_text(form_data.DISCORD_USERINFO_ENDPOINT, 1024)
 
     request.app.state.config.GITLAB_OAUTH_ENABLED = form_data.GITLAB_OAUTH_ENABLED
-    request.app.state.config.GITLAB_CLIENT_ID = _sanitize_text(
-        form_data.GITLAB_CLIENT_ID, 512
-    )
-    request.app.state.config.GITLAB_CLIENT_SECRET = _sanitize_text(
-        form_data.GITLAB_CLIENT_SECRET, 1024
-    )
-    request.app.state.config.GITLAB_OAUTH_SCOPE = _sanitize_text(
-        form_data.GITLAB_OAUTH_SCOPE, 512
-    )
-    request.app.state.config.GITLAB_REDIRECT_URI = _sanitize_text(
-        form_data.GITLAB_REDIRECT_URI, 1024
-    )
-    request.app.state.config.GITLAB_ACCESS_TOKEN_URL = _sanitize_text(
-        form_data.GITLAB_ACCESS_TOKEN_URL, 1024
-    )
-    request.app.state.config.GITLAB_AUTHORIZE_URL = _sanitize_text(
-        form_data.GITLAB_AUTHORIZE_URL, 1024
-    )
-    request.app.state.config.GITLAB_API_BASE_URL = _sanitize_text(
-        form_data.GITLAB_API_BASE_URL, 1024
-    )
-    request.app.state.config.GITLAB_USERINFO_ENDPOINT = _sanitize_text(
-        form_data.GITLAB_USERINFO_ENDPOINT, 1024
-    )
+    request.app.state.config.GITLAB_CLIENT_ID = _sanitize_text(form_data.GITLAB_CLIENT_ID, 512)
+    request.app.state.config.GITLAB_CLIENT_SECRET = _sanitize_text(form_data.GITLAB_CLIENT_SECRET, 1024)
+    request.app.state.config.GITLAB_OAUTH_SCOPE = _sanitize_text(form_data.GITLAB_OAUTH_SCOPE, 512)
+    request.app.state.config.GITLAB_REDIRECT_URI = _sanitize_text(form_data.GITLAB_REDIRECT_URI, 1024)
+    request.app.state.config.GITLAB_ACCESS_TOKEN_URL = _sanitize_text(form_data.GITLAB_ACCESS_TOKEN_URL, 1024)
+    request.app.state.config.GITLAB_AUTHORIZE_URL = _sanitize_text(form_data.GITLAB_AUTHORIZE_URL, 1024)
+    request.app.state.config.GITLAB_API_BASE_URL = _sanitize_text(form_data.GITLAB_API_BASE_URL, 1024)
+    request.app.state.config.GITLAB_USERINFO_ENDPOINT = _sanitize_text(form_data.GITLAB_USERINFO_ENDPOINT, 1024)
 
     request.app.state.config.SLACK_OAUTH_ENABLED = form_data.SLACK_OAUTH_ENABLED
-    request.app.state.config.SLACK_CLIENT_ID = _sanitize_text(
-        form_data.SLACK_CLIENT_ID, 512
-    )
-    request.app.state.config.SLACK_CLIENT_SECRET = _sanitize_text(
-        form_data.SLACK_CLIENT_SECRET, 1024
-    )
-    request.app.state.config.SLACK_OAUTH_SCOPE = _sanitize_text(
-        form_data.SLACK_OAUTH_SCOPE, 512
-    )
-    request.app.state.config.SLACK_REDIRECT_URI = _sanitize_text(
-        form_data.SLACK_REDIRECT_URI, 1024
-    )
-    request.app.state.config.SLACK_ACCESS_TOKEN_URL = _sanitize_text(
-        form_data.SLACK_ACCESS_TOKEN_URL, 1024
-    )
-    request.app.state.config.SLACK_AUTHORIZE_URL = _sanitize_text(
-        form_data.SLACK_AUTHORIZE_URL, 1024
-    )
-    request.app.state.config.SLACK_API_BASE_URL = _sanitize_text(
-        form_data.SLACK_API_BASE_URL, 1024
-    )
-    request.app.state.config.SLACK_USERINFO_ENDPOINT = _sanitize_text(
-        form_data.SLACK_USERINFO_ENDPOINT, 1024
-    )
+    request.app.state.config.SLACK_CLIENT_ID = _sanitize_text(form_data.SLACK_CLIENT_ID, 512)
+    request.app.state.config.SLACK_CLIENT_SECRET = _sanitize_text(form_data.SLACK_CLIENT_SECRET, 1024)
+    request.app.state.config.SLACK_OAUTH_SCOPE = _sanitize_text(form_data.SLACK_OAUTH_SCOPE, 512)
+    request.app.state.config.SLACK_REDIRECT_URI = _sanitize_text(form_data.SLACK_REDIRECT_URI, 1024)
+    request.app.state.config.SLACK_ACCESS_TOKEN_URL = _sanitize_text(form_data.SLACK_ACCESS_TOKEN_URL, 1024)
+    request.app.state.config.SLACK_AUTHORIZE_URL = _sanitize_text(form_data.SLACK_AUTHORIZE_URL, 1024)
+    request.app.state.config.SLACK_API_BASE_URL = _sanitize_text(form_data.SLACK_API_BASE_URL, 1024)
+    request.app.state.config.SLACK_USERINFO_ENDPOINT = _sanitize_text(form_data.SLACK_USERINFO_ENDPOINT, 1024)
 
     try:
         _reload_oauth_runtime(request)
     except Exception as e:
-        log.exception("Failed to reload OAuth configuration")
+        log.exception('Failed to reload OAuth configuration')
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to apply SSO configuration: {e}",
+            detail=f'Failed to apply SSO configuration: {e}',
         )
     request.app.state.config.OAUTH_ALLOWED_LOGIN_PROVIDERS = _sanitize_oauth_provider_list(
         form_data.OAUTH_ALLOWED_LOGIN_PROVIDERS
@@ -1757,93 +1542,63 @@ async def update_admin_config(
     request.app.state.config.ENABLE_INVITE_ONLY_AUTH = form_data.ENABLE_INVITE_ONLY_AUTH
 
     request.app.state.config.INVITE_CREATOR_SCOPE = (
-        form_data.INVITE_CREATOR_SCOPE
-        if form_data.INVITE_CREATOR_SCOPE in ["admin", "groups", "all"]
-        else "admin"
+        form_data.INVITE_CREATOR_SCOPE if form_data.INVITE_CREATOR_SCOPE in ['admin', 'groups', 'all'] else 'admin'
     )
     request.app.state.config.INVITE_CREATOR_GROUP_IDS = [
-        str(group_id)
-        for group_id in (form_data.INVITE_CREATOR_GROUP_IDS or [])
-        if str(group_id).strip()
+        str(group_id) for group_id in (form_data.INVITE_CREATOR_GROUP_IDS or []) if str(group_id).strip()
     ]
     request.app.state.config.INVITE_CREATOR_COOLDOWN_SECONDS = max(
         0, int(form_data.INVITE_CREATOR_COOLDOWN_SECONDS or 0)
     )
-    request.app.state.config.INVITE_CODE_LENGTH = max(
-        4, min(32, int(form_data.INVITE_CODE_LENGTH or 8))
-    )
-    request.app.state.config.INVITE_CODE_TTL_SECONDS = max(
-        0, int(form_data.INVITE_CODE_TTL_SECONDS or 0)
-    )
-    request.app.state.config.INVITE_CODE_PREFIX = re.sub(
-        r"[^A-Za-z0-9_-]", "", form_data.INVITE_CODE_PREFIX or ""
-    )[:24]
+    request.app.state.config.INVITE_CODE_LENGTH = max(4, min(32, int(form_data.INVITE_CODE_LENGTH or 8)))
+    request.app.state.config.INVITE_CODE_TTL_SECONDS = max(0, int(form_data.INVITE_CODE_TTL_SECONDS or 0))
+    request.app.state.config.INVITE_CODE_PREFIX = re.sub(r'[^A-Za-z0-9_-]', '', form_data.INVITE_CODE_PREFIX or '')[:24]
     request.app.state.config.INVITE_CODE_REUSABLE = form_data.INVITE_CODE_REUSABLE
-    request.app.state.config.INVITE_CODE_MAX_USES = max(
-        0, int(form_data.INVITE_CODE_MAX_USES or 0)
-    )
+    request.app.state.config.INVITE_CODE_MAX_USES = max(0, int(form_data.INVITE_CODE_MAX_USES or 0))
 
     request.app.state.config.ENABLE_API_KEYS = form_data.ENABLE_API_KEYS
-    request.app.state.config.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS = (
-        form_data.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS
-    )
-    request.app.state.config.API_KEYS_ALLOWED_ENDPOINTS = (
-        form_data.API_KEYS_ALLOWED_ENDPOINTS
-    )
+    request.app.state.config.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS = form_data.ENABLE_API_KEYS_ENDPOINT_RESTRICTIONS
+    request.app.state.config.API_KEYS_ALLOWED_ENDPOINTS = form_data.API_KEYS_ALLOWED_ENDPOINTS
 
     request.app.state.config.ENABLE_FOLDERS = form_data.ENABLE_FOLDERS
     request.app.state.config.FOLDER_MAX_FILE_COUNT = (
-        int(form_data.FOLDER_MAX_FILE_COUNT) if form_data.FOLDER_MAX_FILE_COUNT else ""
+        int(form_data.FOLDER_MAX_FILE_COUNT) if form_data.FOLDER_MAX_FILE_COUNT else ''
     )
     request.app.state.config.ENABLE_CHANNELS = form_data.ENABLE_CHANNELS
     request.app.state.config.ENABLE_MEMORIES = form_data.ENABLE_MEMORIES
     request.app.state.config.ENABLE_NOTES = form_data.ENABLE_NOTES
 
-    if form_data.DEFAULT_USER_ROLE in ["pending", "user", "admin"]:
+    if form_data.DEFAULT_USER_ROLE in ['pending', 'user', 'admin']:
         request.app.state.config.DEFAULT_USER_ROLE = form_data.DEFAULT_USER_ROLE
 
     request.app.state.config.DEFAULT_GROUP_ID = form_data.DEFAULT_GROUP_ID
 
-    pattern = r"^(-1|0|(-?\d+(\.\d+)?)(ms|s|m|h|d|w))$"
+    pattern = r'^(-1|0|(-?\d+(\.\d+)?)(ms|s|m|h|d|w))$'
 
     # Check if the input string matches the pattern
     if re.match(pattern, form_data.JWT_EXPIRES_IN):
         request.app.state.config.JWT_EXPIRES_IN = form_data.JWT_EXPIRES_IN
 
-    request.app.state.config.ENABLE_COMMUNITY_SHARING = (
-        form_data.ENABLE_COMMUNITY_SHARING
-    )
+    request.app.state.config.ENABLE_COMMUNITY_SHARING = form_data.ENABLE_COMMUNITY_SHARING
     request.app.state.config.ENABLE_MESSAGE_RATING = form_data.ENABLE_MESSAGE_RATING
 
     request.app.state.config.ENABLE_USER_WEBHOOKS = form_data.ENABLE_USER_WEBHOOKS
     request.app.state.config.ENABLE_USER_STATUS = form_data.ENABLE_USER_STATUS
 
     request.app.state.config.ENABLE_SYSTEM_NOTICE = form_data.ENABLE_SYSTEM_NOTICE
-    request.app.state.config.SYSTEM_NOTICE_TITLE = _sanitize_text(
-        form_data.SYSTEM_NOTICE_TITLE, 160
-    )
-    request.app.state.config.SYSTEM_NOTICE_CONTENT = _sanitize_text(
-        form_data.SYSTEM_NOTICE_CONTENT, 10000
-    )
+    request.app.state.config.SYSTEM_NOTICE_TITLE = _sanitize_text(form_data.SYSTEM_NOTICE_TITLE, 160)
+    request.app.state.config.SYSTEM_NOTICE_CONTENT = _sanitize_text(form_data.SYSTEM_NOTICE_CONTENT, 10000)
 
     request.app.state.config.ENABLE_MOTD = form_data.ENABLE_MOTD
     request.app.state.config.MOTD_TITLE = _sanitize_text(form_data.MOTD_TITLE, 160)
-    request.app.state.config.MOTD_CONTENT = _sanitize_text(
-        form_data.MOTD_CONTENT, 10000
+    request.app.state.config.MOTD_CONTENT = _sanitize_text(form_data.MOTD_CONTENT, 10000)
+    request.app.state.config.NOTIFICATION_SOUND_LIBRARY = _sanitize_notification_sound_library(
+        form_data.NOTIFICATION_SOUND_LIBRARY
     )
-    request.app.state.config.NOTIFICATION_SOUND_LIBRARY = (
-        _sanitize_notification_sound_library(form_data.NOTIFICATION_SOUND_LIBRARY)
-    )
-    request.app.state.config.CUSTOM_EMOJI_LIBRARY = _sanitize_custom_emoji_library(
-        form_data.CUSTOM_EMOJI_LIBRARY
-    )
+    request.app.state.config.CUSTOM_EMOJI_LIBRARY = _sanitize_custom_emoji_library(form_data.CUSTOM_EMOJI_LIBRARY)
 
-    request.app.state.config.PENDING_USER_OVERLAY_TITLE = (
-        form_data.PENDING_USER_OVERLAY_TITLE
-    )
-    request.app.state.config.PENDING_USER_OVERLAY_CONTENT = (
-        form_data.PENDING_USER_OVERLAY_CONTENT
-    )
+    request.app.state.config.PENDING_USER_OVERLAY_TITLE = form_data.PENDING_USER_OVERLAY_TITLE
+    request.app.state.config.PENDING_USER_OVERLAY_CONTENT = form_data.PENDING_USER_OVERLAY_CONTENT
 
     request.app.state.config.RESPONSE_WATERMARK = form_data.RESPONSE_WATERMARK
 
@@ -1854,62 +1609,58 @@ class LdapServerConfig(BaseModel):
     label: str
     host: str
     port: Optional[int] = None
-    attribute_for_mail: str = "mail"
-    attribute_for_username: str = "uid"
+    attribute_for_mail: str = 'mail'
+    attribute_for_username: str = 'uid'
     app_dn: str
     app_dn_password: str
     search_base: str
-    search_filters: str = ""
+    search_filters: str = ''
     use_tls: bool = True
     certificate_path: Optional[str] = None
     validate_cert: bool = True
-    ciphers: Optional[str] = "ALL"
+    ciphers: Optional[str] = 'ALL'
 
 
-@router.get("/admin/config/ldap/server", response_model=LdapServerConfig)
+@router.get('/admin/config/ldap/server', response_model=LdapServerConfig)
 async def get_ldap_server(request: Request, user=Depends(get_admin_user)):
     return {
-        "label": request.app.state.config.LDAP_SERVER_LABEL,
-        "host": request.app.state.config.LDAP_SERVER_HOST,
-        "port": request.app.state.config.LDAP_SERVER_PORT,
-        "attribute_for_mail": request.app.state.config.LDAP_ATTRIBUTE_FOR_MAIL,
-        "attribute_for_username": request.app.state.config.LDAP_ATTRIBUTE_FOR_USERNAME,
-        "app_dn": request.app.state.config.LDAP_APP_DN,
-        "app_dn_password": request.app.state.config.LDAP_APP_PASSWORD,
-        "search_base": request.app.state.config.LDAP_SEARCH_BASE,
-        "search_filters": request.app.state.config.LDAP_SEARCH_FILTERS,
-        "use_tls": request.app.state.config.LDAP_USE_TLS,
-        "certificate_path": request.app.state.config.LDAP_CA_CERT_FILE,
-        "validate_cert": request.app.state.config.LDAP_VALIDATE_CERT,
-        "ciphers": request.app.state.config.LDAP_CIPHERS,
+        'label': request.app.state.config.LDAP_SERVER_LABEL,
+        'host': request.app.state.config.LDAP_SERVER_HOST,
+        'port': request.app.state.config.LDAP_SERVER_PORT,
+        'attribute_for_mail': request.app.state.config.LDAP_ATTRIBUTE_FOR_MAIL,
+        'attribute_for_username': request.app.state.config.LDAP_ATTRIBUTE_FOR_USERNAME,
+        'app_dn': request.app.state.config.LDAP_APP_DN,
+        'app_dn_password': request.app.state.config.LDAP_APP_PASSWORD,
+        'search_base': request.app.state.config.LDAP_SEARCH_BASE,
+        'search_filters': request.app.state.config.LDAP_SEARCH_FILTERS,
+        'use_tls': request.app.state.config.LDAP_USE_TLS,
+        'certificate_path': request.app.state.config.LDAP_CA_CERT_FILE,
+        'validate_cert': request.app.state.config.LDAP_VALIDATE_CERT,
+        'ciphers': request.app.state.config.LDAP_CIPHERS,
     }
 
 
-@router.post("/admin/config/ldap/server")
-async def update_ldap_server(
-    request: Request, form_data: LdapServerConfig, user=Depends(get_admin_user)
-):
+@router.post('/admin/config/ldap/server')
+async def update_ldap_server(request: Request, form_data: LdapServerConfig, user=Depends(get_admin_user)):
     required_fields = [
-        "label",
-        "host",
-        "attribute_for_mail",
-        "attribute_for_username",
-        "search_base",
+        'label',
+        'host',
+        'attribute_for_mail',
+        'attribute_for_username',
+        'search_base',
     ]
     for key in required_fields:
         value = getattr(form_data, key)
         if not value:
-            raise HTTPException(400, detail=f"Required field {key} is empty")
+            raise HTTPException(400, detail=f'Required field {key} is empty')
 
     request.app.state.config.LDAP_SERVER_LABEL = form_data.label
     request.app.state.config.LDAP_SERVER_HOST = form_data.host
     request.app.state.config.LDAP_SERVER_PORT = form_data.port
     request.app.state.config.LDAP_ATTRIBUTE_FOR_MAIL = form_data.attribute_for_mail
-    request.app.state.config.LDAP_ATTRIBUTE_FOR_USERNAME = (
-        form_data.attribute_for_username
-    )
-    request.app.state.config.LDAP_APP_DN = form_data.app_dn or ""
-    request.app.state.config.LDAP_APP_PASSWORD = form_data.app_dn_password or ""
+    request.app.state.config.LDAP_ATTRIBUTE_FOR_USERNAME = form_data.attribute_for_username
+    request.app.state.config.LDAP_APP_DN = form_data.app_dn or ''
+    request.app.state.config.LDAP_APP_PASSWORD = form_data.app_dn_password or ''
     request.app.state.config.LDAP_SEARCH_BASE = form_data.search_base
     request.app.state.config.LDAP_SEARCH_FILTERS = form_data.search_filters
     request.app.state.config.LDAP_USE_TLS = form_data.use_tls
@@ -1918,37 +1669,35 @@ async def update_ldap_server(
     request.app.state.config.LDAP_CIPHERS = form_data.ciphers
 
     return {
-        "label": request.app.state.config.LDAP_SERVER_LABEL,
-        "host": request.app.state.config.LDAP_SERVER_HOST,
-        "port": request.app.state.config.LDAP_SERVER_PORT,
-        "attribute_for_mail": request.app.state.config.LDAP_ATTRIBUTE_FOR_MAIL,
-        "attribute_for_username": request.app.state.config.LDAP_ATTRIBUTE_FOR_USERNAME,
-        "app_dn": request.app.state.config.LDAP_APP_DN,
-        "app_dn_password": request.app.state.config.LDAP_APP_PASSWORD,
-        "search_base": request.app.state.config.LDAP_SEARCH_BASE,
-        "search_filters": request.app.state.config.LDAP_SEARCH_FILTERS,
-        "use_tls": request.app.state.config.LDAP_USE_TLS,
-        "certificate_path": request.app.state.config.LDAP_CA_CERT_FILE,
-        "validate_cert": request.app.state.config.LDAP_VALIDATE_CERT,
-        "ciphers": request.app.state.config.LDAP_CIPHERS,
+        'label': request.app.state.config.LDAP_SERVER_LABEL,
+        'host': request.app.state.config.LDAP_SERVER_HOST,
+        'port': request.app.state.config.LDAP_SERVER_PORT,
+        'attribute_for_mail': request.app.state.config.LDAP_ATTRIBUTE_FOR_MAIL,
+        'attribute_for_username': request.app.state.config.LDAP_ATTRIBUTE_FOR_USERNAME,
+        'app_dn': request.app.state.config.LDAP_APP_DN,
+        'app_dn_password': request.app.state.config.LDAP_APP_PASSWORD,
+        'search_base': request.app.state.config.LDAP_SEARCH_BASE,
+        'search_filters': request.app.state.config.LDAP_SEARCH_FILTERS,
+        'use_tls': request.app.state.config.LDAP_USE_TLS,
+        'certificate_path': request.app.state.config.LDAP_CA_CERT_FILE,
+        'validate_cert': request.app.state.config.LDAP_VALIDATE_CERT,
+        'ciphers': request.app.state.config.LDAP_CIPHERS,
     }
 
 
-@router.get("/admin/config/ldap")
+@router.get('/admin/config/ldap')
 async def get_ldap_config(request: Request, user=Depends(get_admin_user)):
-    return {"ENABLE_LDAP": request.app.state.config.ENABLE_LDAP}
+    return {'ENABLE_LDAP': request.app.state.config.ENABLE_LDAP}
 
 
 class LdapConfigForm(BaseModel):
     enable_ldap: Optional[bool] = None
 
 
-@router.post("/admin/config/ldap")
-async def update_ldap_config(
-    request: Request, form_data: LdapConfigForm, user=Depends(get_admin_user)
-):
+@router.post('/admin/config/ldap')
+async def update_ldap_config(request: Request, form_data: LdapConfigForm, user=Depends(get_admin_user)):
     request.app.state.config.ENABLE_LDAP = form_data.enable_ldap
-    return {"ENABLE_LDAP": request.app.state.config.ENABLE_LDAP}
+    return {'ENABLE_LDAP': request.app.state.config.ENABLE_LDAP}
 
 
 ############################
@@ -1957,12 +1706,10 @@ async def update_ldap_config(
 
 
 # create api key
-@router.post("/api_key", response_model=ApiKey)
-async def generate_api_key(
-    request: Request, user=Depends(get_current_user), db: Session = Depends(get_session)
-):
+@router.post('/api_key', response_model=ApiKey)
+async def generate_api_key(request: Request, user=Depends(get_current_user), db: Session = Depends(get_session)):
     if not request.app.state.config.ENABLE_API_KEYS or not has_permission(
-        user.id, "features.api_keys", request.app.state.config.USER_PERMISSIONS
+        user.id, 'features.api_keys', request.app.state.config.USER_PERMISSIONS
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -1974,29 +1721,25 @@ async def generate_api_key(
 
     if success:
         return {
-            "api_key": api_key,
+            'api_key': api_key,
         }
     else:
         raise HTTPException(500, detail=ERROR_MESSAGES.CREATE_API_KEY_ERROR)
 
 
 # delete api key
-@router.delete("/api_key", response_model=bool)
-async def delete_api_key(
-    user=Depends(get_current_user), db: Session = Depends(get_session)
-):
+@router.delete('/api_key', response_model=bool)
+async def delete_api_key(user=Depends(get_current_user), db: Session = Depends(get_session)):
     return Users.delete_user_api_key_by_id(user.id, db=db)
 
 
 # get api key
-@router.get("/api_key", response_model=ApiKey)
-async def get_api_key(
-    user=Depends(get_current_user), db: Session = Depends(get_session)
-):
+@router.get('/api_key', response_model=ApiKey)
+async def get_api_key(user=Depends(get_current_user), db: Session = Depends(get_session)):
     api_key = Users.get_user_api_key_by_id(user.id, db=db)
     if api_key:
         return {
-            "api_key": api_key,
+            'api_key': api_key,
         }
     else:
         raise HTTPException(404, detail=ERROR_MESSAGES.API_KEY_NOT_FOUND)
@@ -2011,7 +1754,7 @@ class TokenExchangeForm(BaseModel):
     token: str  # OAuth access token from external provider
 
 
-@router.post("/oauth/{provider}/token/exchange", response_model=SessionUserResponse)
+@router.post('/oauth/{provider}/token/exchange', response_model=SessionUserResponse)
 async def token_exchange(
     request: Request,
     response: Response,
@@ -2026,7 +1769,7 @@ async def token_exchange(
     if not ENABLE_OAUTH_TOKEN_EXCHANGE:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Token exchange is disabled",
+            detail='Token exchange is disabled',
         )
 
     if not request.app.state.config.ENABLE_OAUTH_LOGIN:
@@ -2037,9 +1780,7 @@ async def token_exchange(
 
     provider = provider.lower()
 
-    allowed_login_providers = _sanitize_oauth_provider_list(
-        request.app.state.config.OAUTH_ALLOWED_LOGIN_PROVIDERS
-    )
+    allowed_login_providers = _sanitize_oauth_provider_list(request.app.state.config.OAUTH_ALLOWED_LOGIN_PROVIDERS)
     if isinstance(allowed_login_providers, list) and provider not in allowed_login_providers:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -2063,19 +1804,19 @@ async def token_exchange(
 
     # Validate the token by calling the userinfo endpoint
     try:
-        token_data = {"access_token": form_data.token, "token_type": "Bearer"}
+        token_data = {'access_token': form_data.token, 'token_type': 'Bearer'}
         user_data = await client.userinfo(token=token_data)
 
         if not user_data:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid token or unable to fetch user info",
+                detail='Invalid token or unable to fetch user info',
             )
     except Exception as e:
-        log.warning(f"Token exchange failed for provider {provider}: {e}")
+        log.warning(f'Token exchange failed for provider {provider}: {e}')
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid token or unable to validate with provider",
+            detail='Invalid token or unable to validate with provider',
         )
 
     # Extract user information from the token claims
@@ -2083,23 +1824,20 @@ async def token_exchange(
     username_claim = request.app.state.config.OAUTH_USERNAME_CLAIM
 
     # Get sub claim
-    sub = user_data.get(
-        request.app.state.config.OAUTH_SUB_CLAIM
-        or OAUTH_PROVIDERS[provider].get("sub_claim", "sub")
-    )
+    sub = user_data.get(request.app.state.config.OAUTH_SUB_CLAIM or OAUTH_PROVIDERS[provider].get('sub_claim', 'sub'))
     if not sub:
-        log.warning(f"Token exchange failed: sub claim missing from user data")
+        log.warning(f'Token exchange failed: sub claim missing from user data')
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Token missing required 'sub' claim",
         )
 
-    email = user_data.get(email_claim, "")
+    email = user_data.get(email_claim, '')
     if not email:
-        log.warning(f"Token exchange failed: email claim missing from user data")
+        log.warning(f'Token exchange failed: email claim missing from user data')
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Token missing required email claim",
+            detail='Token missing required email claim',
         )
     email = email.lower()
 
@@ -2116,7 +1854,7 @@ async def token_exchange(
     if not user:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="User not found. Please sign in via the web interface first.",
+            detail='User not found. Please sign in via the web interface first.',
         )
 
     return create_session_response(request, user, db)

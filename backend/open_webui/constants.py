@@ -91,7 +91,9 @@ class ERROR_MESSAGES(str, Enum):
     )
 
     INVALID_PASSWORD = lambda err='': err if err else 'The password does not meet the required validation criteria.'
-    PASSWORD_REQUIRED_FOR_OAUTH_UNLINK = 'Set a password before unlinking your last SSO provider so you do not lock yourself out.'
+    PASSWORD_REQUIRED_FOR_OAUTH_UNLINK = (
+        'Set a password before unlinking your last SSO provider so you do not lock yourself out.'
+    )
 
 
 class TASKS(str, Enum):
