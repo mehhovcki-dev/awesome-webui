@@ -17,9 +17,13 @@
 	$: {
 		const pathParts = $page.url.pathname.split('/');
 		const tabFromPath = pathParts[pathParts.length - 1];
-		selectedTab = ['authorization', 'notices', 'notification-sounds', 'custom-emojis', 'sso'].includes(
-			tabFromPath
-		)
+		selectedTab = [
+			'authorization',
+			'notices',
+			'notification-sounds',
+			'custom-emojis',
+			'sso'
+		].includes(tabFromPath)
 			? tabFromPath
 			: 'authorization';
 	}

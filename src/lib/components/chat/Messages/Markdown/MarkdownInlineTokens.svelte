@@ -24,7 +24,7 @@
 	export let id: string;
 	export let done = true;
 	export let tokens: Token[];
-	export let sourceIds = [];
+	export let sourceIds: string[] = [];
 	export let onSourceClick: Function = () => {};
 
 	/**
@@ -86,43 +86,91 @@
 
 			return isWhitespaceOnlyTextToken(candidate);
 		});
+
+	const IMAGE_LINK_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.avif', '.svg'];
+
+	const parseHttpUrl = (value: string) => {
+		const rawValue = String(value ?? '').trim();
+		if (!rawValue) {
+			return null;
+		}
+
+		const parseWithBase = (input: string, base?: string) => {
+			try {
+				const parsed = base ? new URL(input, base) : new URL(input);
+				if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+					return parsed;
+				}
+			} catch {
+				// Ignore invalid URLs
+			}
+
+			return null;
+		};
+
+		return (
+			parseWithBase(rawValue) ??
+			(typeof window !== 'undefined' ? parseWithBase(rawValue, window.location.origin) : null)
+		);
+	};
+
+	const isImageLikeHref = (href: string) => {
+		const parsed = parseHttpUrl(href);
+		const pathname = parsed?.pathname?.toLowerCase() ?? '';
+		return IMAGE_LINK_EXTENSIONS.some((extension) => pathname.endsWith(extension));
+	};
+
+	const tokenContainsImage = (token: Token) =>
+		token.type === 'link' && (token.tokens ?? []).some((item) => item.type === 'image');
 </script>
 
 {#each tokens as token, tokenIdx (tokenIdx)}
 	{#if token.type === 'escape'}
 		{unescapeHtml(token.text)}
 	{:else if token.type === 'html'}
-		<HtmlToken {id} {token} {onSourceClick} />
+		<HtmlToken {id} {token} />
 	{:else if token.type === 'link'}
 		{@const noteId = getNoteIdFromHref(token.href)}
+		{@const standaloneLink = isStandaloneLinkToken(tokens, tokenIdx)}
+		{@const imageLikeLink = isImageLikeHref(token.href)}
+		{@const renderImageWithoutAnchor =
+			imageLikeLink && (standaloneLink || tokenContainsImage(token))}
 		{#if noteId}
 			<NoteLinkToken {noteId} href={token.href} />
 		{:else if token.tokens}
 			<span class="inline-block max-w-full">
-				<a
-					href={token.href}
-					target="_blank"
-					rel="nofollow"
-					title={token.title}
-					on:click={(e) => handleLinkClick(e, token.href)}
-				>
+				{#if renderImageWithoutAnchor}
 					<svelte:self id={`${id}-a`} tokens={token.tokens} {onSourceClick} {done} />
-				</a>
-				{#if isStandaloneLinkToken(tokens, tokenIdx)}
+				{:else}
+					<a
+						href={token.href}
+						target="_blank"
+						rel="nofollow"
+						title={token.title}
+						on:click={(e) => handleLinkClick(e, token.href)}
+					>
+						<svelte:self id={`${id}-a`} tokens={token.tokens} {onSourceClick} {done} />
+					</a>
+				{/if}
+				{#if standaloneLink}
 					<LinkEmbed href={token.href} />
 				{/if}
 			</span>
 		{:else}
 			<span class="inline-block max-w-full">
-				<a
-					href={token.href}
-					target="_blank"
-					rel="nofollow"
-					title={token.title}
-					on:click={(e) => handleLinkClick(e, token.href)}>{token.text}</a
-				>
-				{#if isStandaloneLinkToken(tokens, tokenIdx)}
+				{#if renderImageWithoutAnchor}
 					<LinkEmbed href={token.href} />
+				{:else}
+					<a
+						href={token.href}
+						target="_blank"
+						rel="nofollow"
+						title={token.title}
+						on:click={(e) => handleLinkClick(e, token.href)}>{token.text}</a
+					>
+					{#if standaloneLink}
+						<LinkEmbed href={token.href} />
+					{/if}
 				{/if}
 			</span>
 		{/if}
@@ -150,8 +198,11 @@
 			frameborder="0"
 			on:load={(e) => {
 				try {
-					e.currentTarget.style.height =
-						e.currentTarget.contentWindow.document.body.scrollHeight + 20 + 'px';
+					const target = e.currentTarget as HTMLIFrameElement;
+					const bodyHeight = target.contentWindow?.document.body.scrollHeight;
+					if (bodyHeight) {
+						target.style.height = `${bodyHeight + 20}px`;
+					}
 				} catch {}
 			}}
 		></iframe>

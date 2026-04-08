@@ -257,7 +257,10 @@
 		const soundSettings = $settings?.notifications?.sounds ?? {};
 
 		if (kind === 'chat_completion') {
-			const sound = findNotificationSound(soundSettings?.chat_completion_sound_id, 'chat_completion');
+			const sound = findNotificationSound(
+				soundSettings?.chat_completion_sound_id,
+				'chat_completion'
+			);
 			return sound?.data_url || '/audio/notification.mp3';
 		}
 
@@ -268,7 +271,10 @@
 			return perChannelSound.data_url;
 		}
 
-		const globalChannelSound = findNotificationSound(soundSettings?.global_channel_sound_id, 'channel');
+		const globalChannelSound = findNotificationSound(
+			soundSettings?.global_channel_sound_id,
+			'channel'
+		);
 		return globalChannelSound?.data_url || '/audio/notification.mp3';
 	};
 

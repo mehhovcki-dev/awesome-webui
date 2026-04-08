@@ -219,7 +219,11 @@
 
 		for (const [codepoint, rawAliases] of Object.entries(shortCodesData)) {
 			const aliases = (Array.isArray(rawAliases) ? rawAliases : [rawAliases])
-				.map((alias) => String(alias ?? '').trim().toLowerCase())
+				.map((alias) =>
+					String(alias ?? '')
+						.trim()
+						.toLowerCase()
+				)
 				.filter((alias) => alias.length > 0);
 
 			if (aliases.length === 0) {
@@ -514,7 +518,9 @@
 	};
 
 	const parseLocale = (rawLocale: string) => {
-		const normalized = String(rawLocale ?? '').trim().replace('_', '-');
+		const normalized = String(rawLocale ?? '')
+			.trim()
+			.replace('_', '-');
 		const [languagePart = 'en', countryPart = 'US'] = normalized.split('-');
 
 		return {
@@ -981,9 +987,7 @@
 			return true;
 		}
 
-		return (
-			emoji.shortCode.includes(query) || emoji.aliases.some((alias) => alias.includes(query))
-		);
+		return emoji.shortCode.includes(query) || emoji.aliases.some((alias) => alias.includes(query));
 	};
 
 	const buildSection = ({
@@ -1075,10 +1079,10 @@
 			return;
 		}
 
-		recentShortCodes = [normalized, ...recentShortCodes.filter((item) => item !== normalized)].slice(
-			0,
-			MAX_RECENT
-		);
+		recentShortCodes = [
+			normalized,
+			...recentShortCodes.filter((item) => item !== normalized)
+		].slice(0, MAX_RECENT);
 		writeLocalList(RECENT_KEY, recentShortCodes);
 	};
 
@@ -1094,7 +1098,10 @@
 		if (favoriteShortCodes.includes(normalized)) {
 			favoriteShortCodes = favoriteShortCodes.filter((item) => item !== normalized);
 		} else {
-			favoriteShortCodes = [normalized, ...favoriteShortCodes.filter((item) => item !== normalized)];
+			favoriteShortCodes = [
+				normalized,
+				...favoriteShortCodes.filter((item) => item !== normalized)
+			];
 		}
 
 		writeLocalList(FAVORITES_KEY, favoriteShortCodes);
@@ -1823,13 +1830,13 @@
 			return;
 		}
 
-			search = '';
-			activeTab = 'emoji';
-			activeGifSectionId = '';
-			resetGifScrollPosition();
-			resetGifSearchState();
-			onClose();
-		}}
+		search = '';
+		activeTab = 'emoji';
+		activeGifSectionId = '';
+		resetGifScrollPosition();
+		resetGifSearchState();
+		onClose();
+	}}
 	typeahead={false}
 >
 	<DropdownMenu.Trigger>
@@ -1851,14 +1858,14 @@
 						class="px-3 py-1.5 text-sm font-semibold rounded-lg transition {activeTab === 'gif'
 							? 'bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white'
 							: 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}"
-							on:click={() => {
-								activeTab = 'gif';
-								search = '';
-								activeGifSectionId = '';
-								resetGifScrollPosition();
-								resetGifSearchState();
-								void ensureGifTabInitialized();
-							}}
+						on:click={() => {
+							activeTab = 'gif';
+							search = '';
+							activeGifSectionId = '';
+							resetGifScrollPosition();
+							resetGifSearchState();
+							void ensureGifTabInitialized();
+						}}
 					>
 						{$i18n.t('GIFs')}
 					</button>
@@ -1867,13 +1874,13 @@
 						class="px-3 py-1.5 text-sm font-semibold rounded-lg transition {activeTab === 'emoji'
 							? 'bg-gray-200 text-gray-900 dark:bg-gray-700 dark:text-white'
 							: 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800'}"
-							on:click={() => {
-								activeTab = 'emoji';
-								search = '';
-								resetGifScrollPosition();
-								resetGifSearchState();
-								void ensureEmojiDataset();
-							}}
+						on:click={() => {
+							activeTab = 'emoji';
+							search = '';
+							resetGifScrollPosition();
+							resetGifSearchState();
+							void ensureEmojiDataset();
+						}}
 					>
 						{$i18n.t('Emoji')}
 					</button>
@@ -2049,7 +2056,9 @@
 											/>
 										{/if}
 
-										<div class="absolute inset-0 bg-linear-to-t from-black/70 via-black/35 to-black/10" />
+										<div
+											class="absolute inset-0 bg-linear-to-t from-black/70 via-black/35 to-black/10"
+										/>
 
 										<div
 											class="absolute inset-x-0 bottom-0 text-white text-sm font-semibold px-3 py-2.5 text-left tracking-tight drop-shadow-md"
@@ -2078,9 +2087,8 @@
 							{@const activeSection = getGifSectionById(activeGifSectionId)}
 							{#if activeSection}
 								{@const sectionState = getGifSectionState(activeSection.id)}
-								{@const sectionItems = activeSection.type === 'favorites'
-									? favoriteGifItems
-									: sectionState.items}
+								{@const sectionItems =
+									activeSection.type === 'favorites' ? favoriteGifItems : sectionState.items}
 
 								<div class="flex items-center justify-between mb-2 px-0.5">
 									<button
@@ -2219,7 +2227,8 @@
 							<Tooltip content={$i18n.t(section.labelKey)} placement="right">
 								<button
 									type="button"
-									class="w-full h-9 rounded-lg flex items-center justify-center transition {activeSectionId === section.id
+									class="w-full h-9 rounded-lg flex items-center justify-center transition {activeSectionId ===
+									section.id
 										? 'bg-gray-200/80 dark:bg-gray-700/70'
 										: 'hover:bg-gray-100 dark:hover:bg-gray-800'}"
 									on:click={() => jumpToSection(section.id)}

@@ -12,6 +12,7 @@
 	import ProfileImage from './ProfileImage.svelte';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import FileItem from '$lib/components/common/FileItem.svelte';
+	import AudioAttachment from '$lib/components/common/AudioAttachment.svelte';
 	import Markdown from './Markdown.svelte';
 	import Image from '$lib/components/common/Image.svelte';
 	import DeleteConfirmDialog from '$lib/components/common/ConfirmDialog.svelte';
@@ -213,6 +214,13 @@
 							<div class={($settings?.chatBubble ?? true) ? 'self-end' : ''}>
 								{#if file.type === 'image' || (file?.content_type ?? '').startsWith('image/')}
 									<Image src={fileUrl} imageClassName=" max-h-96 rounded-lg" />
+								{:else if file.type === 'audio' || (file?.content_type ?? '').startsWith('audio/')}
+									<AudioAttachment
+										src={fileUrl}
+										name={file.name}
+										size={file?.size}
+										contentType={file?.content_type ?? ''}
+									/>
 								{:else}
 									<FileItem
 										item={file}

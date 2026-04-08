@@ -167,10 +167,7 @@
 									</Tooltip>
 
 									{#if $config?.features?.enable_version_update_check}
-										<a
-											href={`${WEBUI_RELEASES_URL}/tag/v${version.latest}`}
-											target="_blank"
-										>
+										<a href={`${WEBUI_RELEASES_URL}/tag/v${version.latest}`} target="_blank">
 											{updateAvailable === null
 												? $i18n.t('Checking for updates...')
 												: updateAvailable

@@ -87,10 +87,12 @@
 
 		settings.set(nextSettings);
 
-		const response = await updateUserSettings(localStorage.token, { ui: nextSettings }).catch((error) => {
-			toast.error(`${error}`);
-			return null;
-		});
+		const response = await updateUserSettings(localStorage.token, { ui: nextSettings }).catch(
+			(error) => {
+				toast.error(`${error}`);
+				return null;
+			}
+		);
 
 		if (!response) {
 			toast.error($i18n.t('Failed to update channel notification preferences'));

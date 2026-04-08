@@ -238,9 +238,13 @@
 										</div>
 									</div>
 
-									<div class="flex flex-col w-full rounded-lg border border-gray-100 dark:border-gray-850/80 p-3 gap-2">
+									<div
+										class="flex flex-col w-full rounded-lg border border-gray-100 dark:border-gray-850/80 p-3 gap-2"
+									>
 										<div class="text-xs text-gray-500">
-											{$i18n.t('Reset the password to a generated temporary value and require the user to choose a new one after sign-in.')}
+											{$i18n.t(
+												'Reset the password to a generated temporary value and require the user to choose a new one after sign-in.'
+											)}
 										</div>
 
 										<div class="flex flex-wrap gap-2 items-center">

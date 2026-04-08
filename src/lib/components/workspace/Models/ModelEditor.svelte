@@ -108,7 +108,12 @@
 	const onAccessControlChange = async () => {
 		if (edit && model?.id) {
 			try {
-				await updateModelAccessGrants(localStorage.token, model.id, model.name ?? name, accessGrants);
+				await updateModelAccessGrants(
+					localStorage.token,
+					model.id,
+					model.name ?? name,
+					accessGrants
+				);
 				toast.success($i18n.t('Saved'));
 			} catch (error) {
 				toast.error(error?.detail ?? `${error}`);

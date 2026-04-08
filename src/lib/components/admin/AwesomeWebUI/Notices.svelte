@@ -51,8 +51,7 @@
 		}
 	};
 
-	$: guestPreviewTitle =
-		String(adminConfig?.SYSTEM_NOTICE_TITLE ?? '').trim() || t('Notice');
+	$: guestPreviewTitle = String(adminConfig?.SYSTEM_NOTICE_TITLE ?? '').trim() || t('Notice');
 	$: guestPreviewDescription = String(adminConfig?.SYSTEM_NOTICE_CONTENT ?? '');
 	$: guestPreviewDescriptionHtml = renderGuestPreviewDescription(guestPreviewDescription);
 
@@ -150,9 +149,7 @@
 					<div>
 						<div class="text-base font-medium">{$i18n.t('Guest Notification')}</div>
 						<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-							{$i18n.t(
-								'Shown to unregistered users on the auth page.'
-							)}
+							{$i18n.t('Shown to unregistered users on the auth page.')}
 						</div>
 					</div>
 
@@ -197,15 +194,15 @@
 
 						<div class="sm:col-span-2">
 							<div class="text-xs font-medium mb-1">{$i18n.t('Live Guest Preview')}</div>
-							<div class="rounded-xl border border-gray-200/80 dark:border-gray-800 p-3 bg-white/50 dark:bg-gray-950/30">
+							<div
+								class="rounded-xl border border-gray-200/80 dark:border-gray-800 p-3 bg-white/50 dark:bg-gray-950/30"
+							>
 								<div
 									class="mb-1 w-full rounded-2xl border border-gray-200/80 dark:border-gray-800/90 bg-gray-50/80 dark:bg-gray-900/70 p-4 sm:p-5 text-left shadow-sm {adminConfig.ENABLE_SYSTEM_NOTICE
 										? ''
 										: 'opacity-60'}"
 								>
-									<div
-										class="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100"
-									>
+									<div class="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">
 										{guestPreviewTitle}
 									</div>
 									{#if guestPreviewDescription.trim().length > 0}
@@ -239,9 +236,7 @@
 					<div>
 						<div class="text-base font-medium">{$i18n.t('Message of the day')}</div>
 						<div class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-							{$i18n.t(
-								'Shown in the bottom-right corner for signed-in users only.'
-							)}
+							{$i18n.t('Shown in the bottom-right corner for signed-in users only.')}
 						</div>
 					</div>
 

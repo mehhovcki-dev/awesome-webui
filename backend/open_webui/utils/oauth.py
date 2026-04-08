@@ -532,6 +532,64 @@ async def get_oauth_client_info_with_dynamic_client_registration(
         raise e
 
 
+async def get_oauth_client_info_with_static_credentials(
+    request,
+    client_id: str,
+    oauth_server_url: str,
+    oauth_client_id: str,
+    oauth_client_secret: Optional[str] = None,
+) -> OAuthClientInformationFull:
+    try:
+        oauth_server_metadata = None
+        oauth_server_metadata_url = None
+
+        redirect_base_url = (
+            str(request.app.state.config.WEBUI_URL or request.base_url)
+        ).rstrip("/")
+
+        discovery_urls = await get_discovery_urls(oauth_server_url)
+        for url in discovery_urls:
+            async with aiohttp.ClientSession(trust_env=True) as session:
+                async with session.get(
+                    url, ssl=AIOHTTP_CLIENT_SESSION_SSL
+                ) as oauth_server_metadata_response:
+                    if oauth_server_metadata_response.status != 200:
+                        continue
+
+                    try:
+                        oauth_server_metadata = OAuthMetadata.model_validate(
+                            await oauth_server_metadata_response.json()
+                        )
+                        oauth_server_metadata_url = url
+                        break
+                    except Exception as e:
+                        log.error(f"Error parsing OAuth metadata from {url}: {e}")
+                        continue
+
+        oauth_client_info = OAuthClientInformationFull.model_validate(
+            {
+                "client_id": oauth_client_id,
+                "client_secret": oauth_client_secret,
+                "client_name": "Awesome WebUI",
+                "redirect_uris": [
+                    f"{redirect_base_url}/oauth/clients/{client_id}/callback"
+                ],
+                "grant_types": ["authorization_code", "refresh_token"],
+                "response_types": ["code"],
+                "issuer": oauth_server_metadata_url,
+                "server_metadata": oauth_server_metadata,
+            }
+        )
+
+        log.info(
+            f"Static OAuth client configuration prepared for {oauth_server_url}, client_id: {oauth_client_id}"
+        )
+        return oauth_client_info
+    except Exception as e:
+        log.error(f"Exception during static OAuth client configuration: {e}")
+        raise e
+
+
 class OAuthClientManager:
     def __init__(self, app):
         self.oauth = OAuth()

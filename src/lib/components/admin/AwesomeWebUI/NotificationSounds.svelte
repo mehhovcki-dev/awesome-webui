@@ -66,7 +66,9 @@
 		const sound = raw as Partial<NotificationSoundItem>;
 		const id = String(sound.id ?? '').trim();
 		const name = String(sound.name ?? '').trim();
-		const type = String(sound.type ?? '').trim().toLowerCase();
+		const type = String(sound.type ?? '')
+			.trim()
+			.toLowerCase();
 		const dataUrl = String(sound.data_url ?? '').trim();
 
 		if (!id || !name || !dataUrl.startsWith('data:audio/')) {
@@ -87,9 +89,9 @@
 	const normalizeAdminConfig = (configData: Record<string, unknown>): NotificationSoundConfig => ({
 		...configData,
 		NOTIFICATION_SOUND_LIBRARY: Array.isArray(configData?.NOTIFICATION_SOUND_LIBRARY)
-			? configData.NOTIFICATION_SOUND_LIBRARY
-					.map((item) => normalizeSound(item))
-					.filter((item): item is NotificationSoundItem => item !== null)
+			? configData.NOTIFICATION_SOUND_LIBRARY.map((item) => normalizeSound(item)).filter(
+					(item): item is NotificationSoundItem => item !== null
+				)
 			: []
 	});
 

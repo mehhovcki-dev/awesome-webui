@@ -871,7 +871,11 @@
 									const mentionLabel = String(node?.attrs?.label ?? node?.attrs?.id ?? '').trim();
 
 									if (mentionChar !== ':') {
-										return ['span', mergeAttributes(options.HTMLAttributes), `${mentionChar}${mentionLabel}`];
+										return [
+											'span',
+											mergeAttributes(options.HTMLAttributes),
+											`${mentionChar}${mentionLabel}`
+										];
 									}
 
 									const shortCode = normalizeEmojiShortCode(

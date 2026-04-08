@@ -14,10 +14,10 @@
 	import Emoji from '$lib/components/common/Emoji.svelte';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 
-export let user = null;
-let presence: 'online' | 'idle' | 'dnd' | 'offline' = 'offline';
+	export let user = null;
+	let presence: 'online' | 'idle' | 'dnd' | 'offline' = 'offline';
 
-$: presence = getPresenceState(user);
+	$: presence = getPresenceState(user);
 
 	const getPresenceState = (member: any): 'online' | 'idle' | 'dnd' | 'offline' => {
 		const normalized = String(member?.presence_state ?? '').toLowerCase();

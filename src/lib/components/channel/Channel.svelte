@@ -216,7 +216,9 @@
 				status_message: patch?.status_message ?? channelUser?.status_message ?? null,
 				status_expires_at: patch?.status_expires_at ?? channelUser?.status_expires_at ?? null,
 				is_active:
-					typeof patch?.is_active === 'boolean' ? patch.is_active : (channelUser?.is_active ?? false)
+					typeof patch?.is_active === 'boolean'
+						? patch.is_active
+						: (channelUser?.is_active ?? false)
 			};
 		});
 

@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.12-awu.1] - 2026-04-08
+
+### Added
+
+- 📈 **Model Health page.** Added a new in-app Model Health page with search, sorting, model icons, hourly health checks, and 90-day history bars for enabled models.
+- 🔊 **Audio attachments in chat and channels.** Audio files now render with an inline player instead of only appearing as generic file chips.
+- 🧭 **Sidebar navigation entry.** Model Health is now available directly from the main sidebar navigation.
+
+### Changed
+
+- 🖼️ **Cleaner media link rendering in channels.** Standalone image and GIF links now render as media previews without keeping the surrounding clickable link wrapper, while other links keep their normal behavior.
+- 🌐 **Localization coverage.** Added public-facing translation key coverage for the new Model Health experience across locale files, with Russian translations improved for the Awesome WebUI admin area.
+
+### Fixed
+
+- 📱 **Model Health mobile layout.** The page now uses a mobile-friendly card layout instead of forcing the desktop table onto smaller screens.
+- 🧱 **Model Health page shell integration.** The Model Health view now renders inside the normal Open WebUI app content area instead of appearing as a detached block beside the sidebar.
+
 ## [0.8.12] - 2026-03-26
 
 ### Added

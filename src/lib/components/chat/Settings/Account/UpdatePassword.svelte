@@ -28,8 +28,7 @@
 		!forceSetup && !($user?.password_change_required || $user?.has_password === false);
 
 	$: resolvedTitle =
-		title ??
-		(requiresCurrentPassword ? $i18n.t('Change Password') : $i18n.t('Set Password'));
+		title ?? (requiresCurrentPassword ? $i18n.t('Change Password') : $i18n.t('Set Password'));
 
 	$: resolvedDescription =
 		description ??
@@ -38,8 +37,7 @@
 			: $i18n.t('Choose a password for your account before continuing.'));
 
 	$: resolvedSubmitLabel =
-		submitLabel ??
-		(requiresCurrentPassword ? $i18n.t('Update password') : $i18n.t('Set password'));
+		submitLabel ?? (requiresCurrentPassword ? $i18n.t('Update password') : $i18n.t('Set password'));
 
 	const updatePasswordHandler = async () => {
 		if (requiresCurrentPassword && !currentPassword.trim()) {
