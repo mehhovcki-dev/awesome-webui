@@ -40,7 +40,11 @@
 	const standardShortCodes = new Set<string>(
 		Object.values(emojiShortCodes)
 			.flatMap((value) => (Array.isArray(value) ? value : [value]))
-			.map((value) => String(value ?? '').trim().toLowerCase())
+			.map((value) =>
+				String(value ?? '')
+					.trim()
+					.toLowerCase()
+			)
 			.filter((value) => value.length > 0)
 	);
 
@@ -135,9 +139,9 @@
 			return;
 		}
 
-		const sanitizedLibrary = adminConfig.CUSTOM_EMOJI_LIBRARY.map((emoji) => normalizeEmoji(emoji)).filter(
-			(item): item is CustomEmojiItem => item !== null
-		);
+		const sanitizedLibrary = adminConfig.CUSTOM_EMOJI_LIBRARY.map((emoji) =>
+			normalizeEmoji(emoji)
+		).filter((item): item is CustomEmojiItem => item !== null);
 
 		const payload = {
 			...adminConfig,
@@ -406,7 +410,9 @@
 								<div
 									class="rounded-xl border border-gray-200/80 dark:border-gray-800 p-3 bg-white/70 dark:bg-gray-900/60"
 								>
-									<div class="grid gap-3 md:grid-cols-[64px_minmax(0,1fr)_minmax(0,220px)_auto] items-center">
+									<div
+										class="grid gap-3 md:grid-cols-[64px_minmax(0,1fr)_minmax(0,220px)_auto] items-center"
+									>
 										<div class="flex items-center justify-center">
 											<img
 												src={emoji.data_url}
@@ -435,7 +441,9 @@
 
 										<div class="text-[11px] text-gray-500 dark:text-gray-400">
 											<div>
-												{$i18n.t('Uploaded by')}: {emoji.created_by_name || emoji.created_by || 'Unknown'}
+												{$i18n.t('Uploaded by')}: {emoji.created_by_name ||
+													emoji.created_by ||
+													'Unknown'}
 											</div>
 											<div>
 												{$i18n.t('Created')}: {formatTimestamp(emoji.created_at)}

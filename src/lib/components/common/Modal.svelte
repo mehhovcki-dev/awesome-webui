@@ -1,22 +1,19 @@
 <script lang="ts">
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy } from 'svelte';
 	import { fade } from 'svelte/transition';
-
 	import { flyAndScale } from '$lib/utils/transitions';
 	import * as FocusTrap from 'focus-trap';
+
 	export let show = true;
 	export let size = 'md';
 	export let containerClassName = 'p-3';
 	export let className = 'bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm rounded-4xl';
 
-	let modalElement = null;
-	let mounted = false;
-	// Create focus trap to trap user tabs inside modal
-	// https://www.w3.org/WAI/WCAG21/Understanding/focus-order.html
-	// https://www.w3.org/WAI/WCAG21/Understanding/keyboard.html
+	let modalElement: HTMLDivElement | null = null;
+
 	let focusTrap: FocusTrap.FocusTrap | null = null;
 
-	const sizeToWidth = (size) => {
+	const sizeToWidth = (size: string) => {
 		if (size === 'full') {
 			return 'w-full';
 		}
@@ -48,41 +45,56 @@
 
 	const isTopModal = () => {
 		const modals = document.getElementsByClassName('modal');
-		return modals.length && modals[modals.length - 1] === modalElement;
+		return modals.length > 0 && modals[modals.length - 1] === modalElement;
 	};
 
-	onMount(() => {
-		mounted = true;
-	});
+	const getClickableTarget = (target: EventTarget | null) =>
+		target instanceof Element ? target : null;
+
+	const activateFocusTrap = () => {
+		if (!modalElement) {
+			return;
+		}
+		try {
+			focusTrap = FocusTrap.createFocusTrap(modalElement, {
+				allowOutsideClick: (e) => {
+					const target = getClickableTarget(e.target);
+
+					return (
+						target?.closest('[data-sonner-toast]') !== null ||
+						target?.closest('.modal-content') === null
+					);
+				}
+			});
+			focusTrap.activate();
+		} catch (error) {
+			console.error('Failed to initialize modal focus trap', error);
+			focusTrap = null;
+		}
+	};
+
+	const deactivateFocusTrap = () => {
+		if (focusTrap) {
+			focusTrap.deactivate();
+			focusTrap = null;
+		}
+	};
 
 	$: if (show && modalElement) {
-		document.body.appendChild(modalElement);
-		focusTrap = FocusTrap.createFocusTrap(modalElement, {
-			allowOutsideClick: (e) => {
-				return (
-					e.target.closest('[data-sonner-toast]') !== null ||
-					e.target.closest('.modal-content') === null
-				);
-			}
-		});
-		focusTrap.activate();
+		activateFocusTrap();
 		window.addEventListener('keydown', handleKeyDown);
 		document.body.style.overflow = 'hidden';
 	} else if (modalElement) {
-		focusTrap.deactivate();
+		deactivateFocusTrap();
 		window.removeEventListener('keydown', handleKeyDown);
-		document.body.removeChild(modalElement);
 		document.body.style.overflow = 'unset';
 	}
 
 	onDestroy(() => {
 		show = false;
-		if (focusTrap) {
-			focusTrap.deactivate();
-		}
-		if (modalElement) {
-			document.body.removeChild(modalElement);
-		}
+		window.removeEventListener('keydown', handleKeyDown);
+		deactivateFocusTrap();
+		document.body.style.overflow = 'unset';
 	});
 </script>
 
@@ -94,6 +106,7 @@
 		bind:this={modalElement}
 		aria-modal="true"
 		role="dialog"
+		tabindex="-1"
 		class="modal fixed top-0 right-0 left-0 bottom-0 bg-black/30 dark:bg-black/60 w-full h-screen max-h-[100dvh] {containerClassName}  flex justify-center z-9999 overflow-y-auto overscroll-contain"
 		style="scrollbar-gutter: stable;"
 		in:fade={{ duration: 10 }}
@@ -104,7 +117,7 @@
 		<div
 			class="m-auto max-w-full {sizeToWidth(size)} {size !== 'full'
 				? 'mx-2'
-				: ''} shadow-3xl min-h-fit scrollbar-hidden {className} border border-white dark:border-gray-850"
+				: ''} modal-content shadow-3xl min-h-fit scrollbar-hidden {className} border border-white dark:border-gray-850"
 			in:flyAndScale
 			on:mousedown={(e) => {
 				e.stopPropagation();

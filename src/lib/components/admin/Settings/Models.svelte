@@ -128,7 +128,8 @@
 	}
 
 	$: allFilteredSelected =
-		filteredModels.length > 0 && filteredModels.every((model) => selectedModelIds.includes(model.id));
+		filteredModels.length > 0 &&
+		filteredModels.every((model) => selectedModelIds.includes(model.id));
 	$: selectedCountLabel = $i18n.t('{{COUNT}} models', { COUNT: selectedModelIds.length });
 	$: if (!batchGroupId && groups.length > 0) {
 		batchGroupId = groups[0].id;
@@ -468,22 +469,19 @@
 			return;
 		}
 
-		await runBatchUpdate(
-			async () => {
-				let updatedCount = 0;
+		await runBatchUpdate(async () => {
+			let updatedCount = 0;
 
-				for (const model of selectedModels()) {
-					model.access_grants = JSON.parse(JSON.stringify(grants));
-					const updated = await persistModel(model, false);
-					if (updated) {
-						updatedCount += 1;
-					}
+			for (const model of selectedModels()) {
+				model.access_grants = JSON.parse(JSON.stringify(grants));
+				const updated = await persistModel(model, false);
+				if (updated) {
+					updatedCount += 1;
 				}
+			}
 
-				return updatedCount;
-			},
-			$i18n.t('Selected models access updated successfully')
-		);
+			return updatedCount;
+		}, $i18n.t('Selected models access updated successfully'));
 	};
 
 	const applyBatchNameTemplate = async () => {
@@ -493,53 +491,47 @@
 			return;
 		}
 
-		await runBatchUpdate(
-			async () => {
-				let updatedCount = 0;
-				for (const [index, model] of selectedModelsInDisplayOrder().entries()) {
-					const nextName = template
-						.replaceAll('{name}', model.name ?? model.id)
-						.replaceAll('{id}', model.id)
-						.replaceAll('{index}', `${index + 1}`)
-						.trim();
+		await runBatchUpdate(async () => {
+			let updatedCount = 0;
+			for (const [index, model] of selectedModelsInDisplayOrder().entries()) {
+				const nextName = template
+					.replaceAll('{name}', model.name ?? model.id)
+					.replaceAll('{id}', model.id)
+					.replaceAll('{index}', `${index + 1}`)
+					.trim();
 
-					if (nextName === '' || nextName === model.name) {
-						continue;
-					}
-
-					model.name = nextName;
-					const updated = await persistModel(model, false);
-					if (updated) {
-						updatedCount += 1;
-					}
+				if (nextName === '' || nextName === model.name) {
+					continue;
 				}
 
-				return updatedCount;
-			},
-			$i18n.t('Selected models renamed successfully')
-		);
+				model.name = nextName;
+				const updated = await persistModel(model, false);
+				if (updated) {
+					updatedCount += 1;
+				}
+			}
+
+			return updatedCount;
+		}, $i18n.t('Selected models renamed successfully'));
 	};
 
 	const applyBatchIcon = async (profileImageUrl: string) => {
-		await runBatchUpdate(
-			async () => {
-				let updatedCount = 0;
-				for (const model of selectedModels()) {
-					model.meta = {
-						...model.meta,
-						profile_image_url: profileImageUrl
-					};
+		await runBatchUpdate(async () => {
+			let updatedCount = 0;
+			for (const model of selectedModels()) {
+				model.meta = {
+					...model.meta,
+					profile_image_url: profileImageUrl
+				};
 
-					const updated = await persistModel(model, false);
-					if (updated) {
-						updatedCount += 1;
-					}
+				const updated = await persistModel(model, false);
+				if (updated) {
+					updatedCount += 1;
 				}
+			}
 
-				return updatedCount;
-			},
-			$i18n.t('Selected models icon updated successfully')
-		);
+			return updatedCount;
+		}, $i18n.t('Selected models icon updated successfully'));
 	};
 
 	const uploadBatchIcon = async () => {

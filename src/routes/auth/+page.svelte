@@ -65,7 +65,9 @@
 	};
 
 	const sessionNeedsPasswordSetup = (sessionUser) =>
-		Boolean(sessionUser && (sessionUser.password_change_required || sessionUser.has_password === false));
+		Boolean(
+			sessionUser && (sessionUser.password_change_required || sessionUser.has_password === false)
+		);
 
 	const setSessionUser = async (sessionUser, redirectPath: string | null = null) => {
 		if (sessionUser) {
@@ -351,7 +353,9 @@
 								</div>
 							{/if}
 							{#if requiresPasswordSetup}
-								<div class="flex flex-col justify-center text-left rounded-2xl border border-gray-200/80 dark:border-gray-800/90 bg-gray-50/80 dark:bg-gray-900/70 p-5 shadow-sm">
+								<div
+									class="flex flex-col justify-center text-left rounded-2xl border border-gray-200/80 dark:border-gray-800/90 bg-gray-50/80 dark:bg-gray-900/70 p-5 shadow-sm"
+								>
 									<div class="text-2xl font-medium text-center">
 										{$i18n.t('Set Your Password')}
 									</div>
@@ -365,7 +369,9 @@
 											showByDefault={true}
 											forceSetup={true}
 											hideToggle={true}
-											description={$i18n.t('You will be taken back to the app as soon as your new password is saved.')}
+											description={$i18n.t(
+												'You will be taken back to the app as soon as your new password is saved.'
+											)}
 											onSuccess={completePasswordSetup}
 										/>
 									</div>
@@ -382,11 +388,15 @@
 										<div
 											class="mb-4 w-full rounded-2xl border border-gray-200/80 dark:border-gray-800/90 bg-gray-50/80 dark:bg-gray-900/70 p-4 sm:p-5 text-left shadow-sm"
 										>
-											<div class="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100">
+											<div
+												class="text-base sm:text-lg font-semibold text-gray-900 dark:text-gray-100"
+											>
 												{guestNotificationTitle}
 											</div>
 											{#if guestNotificationDescription}
-												<div class="mt-2 text-sm leading-relaxed text-gray-700 dark:text-gray-300 marked">
+												<div
+													class="mt-2 text-sm leading-relaxed text-gray-700 dark:text-gray-300 marked"
+												>
 													{@html DOMPurify.sanitize(marked(guestNotificationDescription))}
 												</div>
 											{/if}
@@ -398,7 +408,9 @@
 											{#if $config?.onboarding ?? false}
 												{$i18n.t(`Get started with {{WEBUI_NAME}}`, { WEBUI_NAME: $WEBUI_NAME })}
 											{:else if mode === 'ldap'}
-												{$i18n.t(`Sign in to {{WEBUI_NAME}} with LDAP`, { WEBUI_NAME: $WEBUI_NAME })}
+												{$i18n.t(`Sign in to {{WEBUI_NAME}} with LDAP`, {
+													WEBUI_NAME: $WEBUI_NAME
+												})}
 											{:else if mode === 'signin'}
 												{$i18n.t(`Sign in to {{WEBUI_NAME}}`, { WEBUI_NAME: $WEBUI_NAME })}
 											{:else}
@@ -545,9 +557,7 @@
 															: $i18n.t('Create Account')}
 												</button>
 
-												{#if $config?.features.enable_signup &&
-													($config?.features.enable_password_signup ?? true) &&
-													!($config?.onboarding ?? false)}
+												{#if $config?.features.enable_signup && ($config?.features.enable_password_signup ?? true) && !($config?.onboarding ?? false)}
 													<div class=" mt-4 text-sm text-center">
 														{mode === 'signin'
 															? $i18n.t("Don't have an account?")
@@ -574,97 +584,98 @@
 								</form>
 
 								{#if ($config?.features?.enable_oauth_login ?? true) && visibleOAuthProviders.length > 0}
-								<div class="inline-flex items-center justify-center w-full">
-									<hr class="w-32 h-px my-4 border-0 dark:bg-gray-100/10 bg-gray-700/10" />
-									{#if $config?.features.enable_login_form || $config?.features.enable_ldap || form}
-										<span
-											class="px-3 text-sm font-medium text-gray-900 dark:text-white bg-transparent"
-											>{$i18n.t('or')}</span
-										>
-									{/if}
+									<div class="inline-flex items-center justify-center w-full">
+										<hr class="w-32 h-px my-4 border-0 dark:bg-gray-100/10 bg-gray-700/10" />
+										{#if $config?.features.enable_login_form || $config?.features.enable_ldap || form}
+											<span
+												class="px-3 text-sm font-medium text-gray-900 dark:text-white bg-transparent"
+												>{$i18n.t('or')}</span
+											>
+										{/if}
 
-									<hr class="w-32 h-px my-4 border-0 dark:bg-gray-100/10 bg-gray-700/10" />
-								</div>
-								<div class="flex flex-col space-y-2">
-									{#if visibleOAuthProviders.includes('google')}
-										<button
-											class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
-											on:click={() => {
-												window.location.href = getOAuthLoginUrl('google');
-											}}
-										>
-											<svg
-												xmlns="http://www.w3.org/2000/svg"
-												viewBox="0 0 48 48"
-												class="size-6 mr-3"
-												aria-hidden="true"
+										<hr class="w-32 h-px my-4 border-0 dark:bg-gray-100/10 bg-gray-700/10" />
+									</div>
+									<div class="flex flex-col space-y-2">
+										{#if visibleOAuthProviders.includes('google')}
+											<button
+												class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
+												on:click={() => {
+													window.location.href = getOAuthLoginUrl('google');
+												}}
 											>
-												<path
-													fill="#EA4335"
-													d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
-												/><path
-													fill="#4285F4"
-													d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
-												/><path
-													fill="#FBBC05"
-													d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
-												/><path
-													fill="#34A853"
-													d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
-												/><path fill="none" d="M0 0h48v48H0z" />
-											</svg>
-											<span>{$i18n.t('Continue with {{provider}}', { provider: 'Google' })}</span>
-										</button>
-									{/if}
-									{#if visibleOAuthProviders.includes('microsoft')}
-										<button
-											class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
-											on:click={() => {
-												window.location.href = getOAuthLoginUrl('microsoft');
-											}}
-										>
-											<svg
-												xmlns="http://www.w3.org/2000/svg"
-												viewBox="0 0 21 21"
-												class="size-6 mr-3"
-												aria-hidden="true"
+												<svg
+													xmlns="http://www.w3.org/2000/svg"
+													viewBox="0 0 48 48"
+													class="size-6 mr-3"
+													aria-hidden="true"
+												>
+													<path
+														fill="#EA4335"
+														d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"
+													/><path
+														fill="#4285F4"
+														d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"
+													/><path
+														fill="#FBBC05"
+														d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"
+													/><path
+														fill="#34A853"
+														d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"
+													/><path fill="none" d="M0 0h48v48H0z" />
+												</svg>
+												<span>{$i18n.t('Continue with {{provider}}', { provider: 'Google' })}</span>
+											</button>
+										{/if}
+										{#if visibleOAuthProviders.includes('microsoft')}
+											<button
+												class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
+												on:click={() => {
+													window.location.href = getOAuthLoginUrl('microsoft');
+												}}
 											>
-												<rect x="1" y="1" width="9" height="9" fill="#f25022" /><rect
-													x="1"
-													y="11"
-													width="9"
-													height="9"
-													fill="#00a4ef"
-												/><rect x="11" y="1" width="9" height="9" fill="#7fba00" /><rect
-													x="11"
-													y="11"
-													width="9"
-													height="9"
-													fill="#ffb900"
-												/>
-											</svg>
-											<span>{$i18n.t('Continue with {{provider}}', { provider: 'Microsoft' })}</span
-											>
-										</button>
-									{/if}
+												<svg
+													xmlns="http://www.w3.org/2000/svg"
+													viewBox="0 0 21 21"
+													class="size-6 mr-3"
+													aria-hidden="true"
+												>
+													<rect x="1" y="1" width="9" height="9" fill="#f25022" /><rect
+														x="1"
+														y="11"
+														width="9"
+														height="9"
+														fill="#00a4ef"
+													/><rect x="11" y="1" width="9" height="9" fill="#7fba00" /><rect
+														x="11"
+														y="11"
+														width="9"
+														height="9"
+														fill="#ffb900"
+													/>
+												</svg>
+												<span
+													>{$i18n.t('Continue with {{provider}}', { provider: 'Microsoft' })}</span
+												>
+											</button>
+										{/if}
 										{#if visibleOAuthProviders.includes('github')}
 											<button
 												class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
 												on:click={() => {
-												window.location.href = getOAuthLoginUrl('github');
-											}}
-										>
-											<svg
-												xmlns="http://www.w3.org/2000/svg"
-												viewBox="0 0 24 24"
-												class="size-6 mr-3"
-												aria-hidden="true"
+													window.location.href = getOAuthLoginUrl('github');
+												}}
 											>
-												<path
-													fill="currentColor"
-													d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.92 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57C20.565 21.795 24 17.31 24 12c0-6.63-5.37-12-12-12z"
-												/>
-											</svg>
+												<svg
+													xmlns="http://www.w3.org/2000/svg"
+													viewBox="0 0 24 24"
+													class="size-6 mr-3"
+													aria-hidden="true"
+												>
+													<path
+														fill="currentColor"
+														d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.92 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57C20.565 21.795 24 17.31 24 12c0-6.63-5.37-12-12-12z"
+													/>
+												</svg>
 												<span>{$i18n.t('Continue with {{provider}}', { provider: 'GitHub' })}</span>
 											</button>
 										{/if}
@@ -716,65 +727,66 @@
 											<button
 												class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
 												on:click={() => {
-												window.location.href = getOAuthLoginUrl('oidc');
-											}}
-										>
-											<svg
-												xmlns="http://www.w3.org/2000/svg"
-												fill="none"
-												viewBox="0 0 24 24"
-												stroke-width="1.5"
-												stroke="currentColor"
-												class="size-6 mr-3"
-												aria-hidden="true"
+													window.location.href = getOAuthLoginUrl('oidc');
+												}}
 											>
-												<path
-													stroke-linecap="round"
-													stroke-linejoin="round"
-													d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z"
-												/>
-											</svg>
+												<svg
+													xmlns="http://www.w3.org/2000/svg"
+													fill="none"
+													viewBox="0 0 24 24"
+													stroke-width="1.5"
+													stroke="currentColor"
+													class="size-6 mr-3"
+													aria-hidden="true"
+												>
+													<path
+														stroke-linecap="round"
+														stroke-linejoin="round"
+														d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z"
+													/>
+												</svg>
 
-											<span
-												>{$i18n.t('Continue with {{provider}}', {
-													provider: $config?.oauth?.providers?.oidc ?? 'SSO'
-												})}</span
+												<span
+													>{$i18n.t('Continue with {{provider}}', {
+														provider: $config?.oauth?.providers?.oidc ?? 'SSO'
+													})}</span
+												>
+											</button>
+										{/if}
+										{#if visibleOAuthProviders.includes('feishu')}
+											<button
+												class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
+												on:click={() => {
+													window.location.href = getOAuthLoginUrl('feishu');
+												}}
 											>
-										</button>
-									{/if}
-									{#if visibleOAuthProviders.includes('feishu')}
-										<button
-											class="flex justify-center items-center bg-gray-700/5 hover:bg-gray-700/10 dark:bg-gray-100/5 dark:hover:bg-gray-100/10 dark:text-gray-300 dark:hover:text-white transition w-full rounded-full font-medium text-sm py-2.5"
-											on:click={() => {
-												window.location.href = getOAuthLoginUrl('feishu');
-											}}
-										>
-											<span>{$i18n.t('Continue with {{provider}}', { provider: 'Feishu' })}</span>
-										</button>
-									{/if}
-									{#if visibleOAuthProviders.includes('discord')}
-										<button
-											class="flex justify-center items-center bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 transition w-full rounded-full font-medium text-sm py-2.5"
-											on:click={() => {
-												window.location.href = getOAuthLoginUrl('discord');
-											}}
-										>
-											<svg
-												xmlns="http://www.w3.org/2000/svg"
-												viewBox="0 0 256 199"
-												class="size-6 mr-3"
-												aria-hidden="true"
+												<span>{$i18n.t('Continue with {{provider}}', { provider: 'Feishu' })}</span>
+											</button>
+										{/if}
+										{#if visibleOAuthProviders.includes('discord')}
+											<button
+												class="flex justify-center items-center bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 transition w-full rounded-full font-medium text-sm py-2.5"
+												on:click={() => {
+													window.location.href = getOAuthLoginUrl('discord');
+												}}
 											>
-												<path
-													fill="currentColor"
-													d="M216.9 16.6A208.5 208.5 0 0 0 163.3 0a150.5 150.5 0 0 0-6.8 13.9a193.2 193.2 0 0 0-57 0A150.5 150.5 0 0 0 92.7 0A208.5 208.5 0 0 0 39.1 16.6C5.2 67.5-3.9 117.1.6 165.8a209.9 209.9 0 0 0 64.7 33.2a161.8 161.8 0 0 0 13.9-22.6a133.7 133.7 0 0 1-21.9-10.5c1.9-1.4 3.7-2.8 5.4-4.3c42.3 19.8 88.2 19.8 130 0c1.8 1.5 3.6 2.9 5.4 4.3a133.7 133.7 0 0 1-21.9 10.5a161.8 161.8 0 0 0 13.9 22.6a209.9 209.9 0 0 0 64.7-33.2c5.3-56.4-9.1-105.5-37.9-149.2ZM85.5 135.6c-12.6 0-22.9-11.6-22.9-25.8s10.1-25.8 22.9-25.8s23.1 11.6 22.9 25.8s-10.2 25.8-22.9 25.8Zm84.9 0c-12.6 0-22.9-11.6-22.9-25.8s10.1-25.8 22.9-25.8s23.1 11.6 22.9 25.8s-10.2 25.8-22.9 25.8Z"
-												/>
-											</svg>
-											<span>{$i18n.t('Continue with {{provider}}', { provider: 'Discord' })}</span>
-										</button>
-									{/if}
-								</div>
-							{/if}
+												<svg
+													xmlns="http://www.w3.org/2000/svg"
+													viewBox="0 0 256 199"
+													class="size-6 mr-3"
+													aria-hidden="true"
+												>
+													<path
+														fill="currentColor"
+														d="M216.9 16.6A208.5 208.5 0 0 0 163.3 0a150.5 150.5 0 0 0-6.8 13.9a193.2 193.2 0 0 0-57 0A150.5 150.5 0 0 0 92.7 0A208.5 208.5 0 0 0 39.1 16.6C5.2 67.5-3.9 117.1.6 165.8a209.9 209.9 0 0 0 64.7 33.2a161.8 161.8 0 0 0 13.9-22.6a133.7 133.7 0 0 1-21.9-10.5c1.9-1.4 3.7-2.8 5.4-4.3c42.3 19.8 88.2 19.8 130 0c1.8 1.5 3.6 2.9 5.4 4.3a133.7 133.7 0 0 1-21.9 10.5a161.8 161.8 0 0 0 13.9 22.6a209.9 209.9 0 0 0 64.7-33.2c5.3-56.4-9.1-105.5-37.9-149.2ZM85.5 135.6c-12.6 0-22.9-11.6-22.9-25.8s10.1-25.8 22.9-25.8s23.1 11.6 22.9 25.8s-10.2 25.8-22.9 25.8Zm84.9 0c-12.6 0-22.9-11.6-22.9-25.8s10.1-25.8 22.9-25.8s23.1 11.6 22.9 25.8s-10.2 25.8-22.9 25.8Z"
+													/>
+												</svg>
+												<span>{$i18n.t('Continue with {{provider}}', { provider: 'Discord' })}</span
+												>
+											</button>
+										{/if}
+									</div>
+								{/if}
 
 								{#if $config?.features.enable_ldap && $config?.features.enable_login_form}
 									<div class="mt-2">
@@ -824,6 +836,5 @@
 				</div>
 			</div>
 		{/if}
-
 	{/if}
 </div>

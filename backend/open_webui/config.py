@@ -2893,6 +2893,19 @@ DEFAULT_CODE_INTERPRETER_PROMPT = """
 
 Ensure that the tools are effectively utilized to achieve the highest-quality analysis for the user."""
 
+# Appended to the code interpreter prompt only when engine is pyodide (not jupyter).
+CODE_INTERPRETER_PYODIDE_FS_PROMPT = """
+
+##### Persistent File System
+
+- User-uploaded files are available at `/mnt/uploads/`. When the user asks you to work with their files, read from this directory.
+- You can also write output files to `/mnt/uploads/` so the user can access and download them from the file browser.
+- The file system persists across code executions within the same session.
+- Use `import os; os.listdir('/mnt/uploads')` to discover available files."""
+
+# Backward compatibility for code paths that still import the pre-upstream-sync name.
+CODE_INTERPRETER_PYODIDE_PROMPT = CODE_INTERPRETER_PYODIDE_FS_PROMPT
+
 
 ####################################
 # Vector Database
@@ -2988,6 +3001,63 @@ SSL_ASSERT_FINGERPRINT = os.environ.get("SSL_ASSERT_FINGERPRINT", None)
 ELASTICSEARCH_INDEX_PREFIX = os.environ.get(
     "ELASTICSEARCH_INDEX_PREFIX", "open_webui_collections"
 )
+
+# MariaDB Vector (mariadb-vector)
+MARIADB_VECTOR_DB_URL = os.environ.get("MARIADB_VECTOR_DB_URL", "").strip()
+
+MARIADB_VECTOR_INITIALIZE_MAX_VECTOR_LENGTH = int(
+    os.environ.get("MARIADB_VECTOR_INITIALIZE_MAX_VECTOR_LENGTH", "1536").strip()
+    or "1536"
+)
+
+MARIADB_VECTOR_DISTANCE_STRATEGY = (
+    os.environ.get("MARIADB_VECTOR_DISTANCE_STRATEGY", "cosine").strip().lower()
+)
+
+MARIADB_VECTOR_INDEX_M = int(
+    os.environ.get("MARIADB_VECTOR_INDEX_M", "8").strip() or "8"
+)
+
+MARIADB_VECTOR_POOL_SIZE = os.environ.get("MARIADB_VECTOR_POOL_SIZE", None)
+
+if MARIADB_VECTOR_POOL_SIZE is not None:
+    try:
+        MARIADB_VECTOR_POOL_SIZE = int(MARIADB_VECTOR_POOL_SIZE)
+    except Exception:
+        MARIADB_VECTOR_POOL_SIZE = None
+
+MARIADB_VECTOR_POOL_MAX_OVERFLOW = os.environ.get(
+    "MARIADB_VECTOR_POOL_MAX_OVERFLOW", 0
+)
+
+if MARIADB_VECTOR_POOL_MAX_OVERFLOW == "":
+    MARIADB_VECTOR_POOL_MAX_OVERFLOW = 0
+else:
+    try:
+        MARIADB_VECTOR_POOL_MAX_OVERFLOW = int(MARIADB_VECTOR_POOL_MAX_OVERFLOW)
+    except Exception:
+        MARIADB_VECTOR_POOL_MAX_OVERFLOW = 0
+
+MARIADB_VECTOR_POOL_TIMEOUT = os.environ.get("MARIADB_VECTOR_POOL_TIMEOUT", 30)
+
+if MARIADB_VECTOR_POOL_TIMEOUT == "":
+    MARIADB_VECTOR_POOL_TIMEOUT = 30
+else:
+    try:
+        MARIADB_VECTOR_POOL_TIMEOUT = int(MARIADB_VECTOR_POOL_TIMEOUT)
+    except Exception:
+        MARIADB_VECTOR_POOL_TIMEOUT = 30
+
+MARIADB_VECTOR_POOL_RECYCLE = os.environ.get("MARIADB_VECTOR_POOL_RECYCLE", 3600)
+
+if MARIADB_VECTOR_POOL_RECYCLE == "":
+    MARIADB_VECTOR_POOL_RECYCLE = 3600
+else:
+    try:
+        MARIADB_VECTOR_POOL_RECYCLE = int(MARIADB_VECTOR_POOL_RECYCLE)
+    except Exception:
+        MARIADB_VECTOR_POOL_RECYCLE = 3600
+
 # Pgvector
 PGVECTOR_DB_URL = os.environ.get("PGVECTOR_DB_URL", DATABASE_URL)
 if VECTOR_DB == "pgvector" and not PGVECTOR_DB_URL.startswith("postgres"):

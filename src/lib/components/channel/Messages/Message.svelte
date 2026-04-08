@@ -28,6 +28,7 @@
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import Textarea from '$lib/components/common/Textarea.svelte';
 	import Image from '$lib/components/common/Image.svelte';
+	import AudioAttachment from '$lib/components/common/AudioAttachment.svelte';
 	import FileItem from '$lib/components/common/FileItem.svelte';
 	import ProfilePreview from './Message/ProfilePreview.svelte';
 	import ChatBubbleOvalEllipsis from '$lib/components/icons/ChatBubble.svelte';
@@ -64,6 +65,11 @@
 	let edit = false;
 	let editedContent = null;
 	let showDeleteConfirmDialog = false;
+
+	const normalizeChatDirection = (value?: string): 'ltr' | 'rtl' | 'auto' => {
+		const normalized = String(value ?? 'auto').toLowerCase();
+		return normalized === 'ltr' || normalized === 'rtl' ? normalized : 'auto';
+	};
 
 	const loadMessageData = async () => {
 		if (message && message?.data === true) {
@@ -273,7 +279,7 @@
 		<div
 			class=" flex w-full message-{message.id} "
 			id="message-{message.id}"
-			dir={$settings.chatDirection}
+			dir={normalizeChatDirection($settings?.chatDirection)}
 		>
 			<div class={`shrink-0 mr-1 w-9`}>
 				{#if showUserProfile}
@@ -354,7 +360,7 @@
 				{:else if (message?.data?.files ?? []).length > 0}
 					<div
 						class="my-2.5 w-full flex overflow-x-auto gap-2 flex-wrap"
-						dir={$settings?.chatDirection ?? 'auto'}
+						dir={normalizeChatDirection($settings?.chatDirection)}
 					>
 						{#each message?.data?.files as file}
 							{@const fileUrl =
@@ -366,6 +372,13 @@
 									<Image src={fileUrl} alt={file.name} imageClassName=" max-h-96 rounded-lg" />
 								{:else if file.type === 'video' || (file?.content_type ?? '').startsWith('video/')}
 									<video src={fileUrl} controls class=" max-h-96 rounded-lg"></video>
+								{:else if file.type === 'audio' || (file?.content_type ?? '').startsWith('audio/')}
+									<AudioAttachment
+										src={fileUrl}
+										name={file.name}
+										size={file?.size}
+										contentType={file?.content_type ?? ''}
+									/>
 								{:else}
 									<FileItem
 										item={file}

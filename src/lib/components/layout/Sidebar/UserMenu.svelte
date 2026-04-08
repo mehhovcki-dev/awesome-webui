@@ -17,6 +17,7 @@
 	import ArchiveBox from '$lib/components/icons/ArchiveBox.svelte';
 	import QuestionMarkCircle from '$lib/components/icons/QuestionMarkCircle.svelte';
 	import Map from '$lib/components/icons/Map.svelte';
+	import ChartBar from '$lib/components/icons/ChartBar.svelte';
 	import Keyboard from '$lib/components/icons/Keyboard.svelte';
 	import ShortcutsModal from '$lib/components/chat/ShortcutsModal.svelte';
 	import Settings from '$lib/components/icons/Settings.svelte';
@@ -426,6 +427,20 @@
 				<hr class=" border-gray-50/30 dark:border-gray-800/30 my-1 p-0" />
 
 				<!-- {$i18n.t('Help')} -->
+
+				<a
+					href="/model-health"
+					draggable="false"
+					class="flex rounded-xl py-1.5 px-3 w-full hover:bg-gray-50 dark:hover:bg-gray-800 transition cursor-pointer select-none"
+					on:click={() => {
+						show = false;
+					}}
+				>
+					<div class=" self-center mr-3">
+						<ChartBar className="size-5" />
+					</div>
+					<div class=" self-center truncate">{$i18n.t('Model Health')}</div>
+				</a>
 
 				{#if $user?.role === 'admin'}
 					<a

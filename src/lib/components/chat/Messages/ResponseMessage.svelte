@@ -42,6 +42,7 @@
 	import ProfileImage from './ProfileImage.svelte';
 	import Skeleton from './Skeleton.svelte';
 	import Image from '$lib/components/common/Image.svelte';
+	import AudioAttachment from '$lib/components/common/AudioAttachment.svelte';
 	import Tooltip from '$lib/components/common/Tooltip.svelte';
 	import RateComment from './RateComment.svelte';
 	import Spinner from '$lib/components/common/Spinner.svelte';
@@ -64,10 +65,17 @@
 	import FullHeightIframe from '$lib/components/common/FullHeightIframe.svelte';
 
 	interface MessageType {
+		files?: {
+			type: string;
+			url: string;
+			name?: string;
+			size?: number;
+			content_type?: string;
+		}[];
+		embeds?: string[];
 		id: string;
 		model: string;
 		content: string;
-		files?: { type: string; url: string }[];
 		timestamp: number;
 		role: string;
 		statusHistory?: {
@@ -165,7 +173,12 @@
 	let buttonsContainerElement: HTMLDivElement;
 	let showDeleteConfirm = false;
 
-	let model = null;
+	const normalizeChatDirection = (value?: string): 'ltr' | 'rtl' | 'auto' => {
+		const normalized = String(value ?? 'auto').toLowerCase();
+		return normalized === 'ltr' || normalized === 'rtl' ? normalized : 'auto';
+	};
+
+	let model: any = null;
 	$: model = $models.find((m) => m.id === message.model);
 
 	$: statusEntries = message?.statusHistory ?? [...(message?.status ? [message?.status] : [])];
@@ -625,7 +638,7 @@
 	<div
 		class=" flex w-full message-{message.id}"
 		id="message-{message.id}"
-		dir={$settings.chatDirection}
+		dir={normalizeChatDirection($settings?.chatDirection)}
 		style="scroll-margin-top: 3rem;"
 	>
 		<div class={`shrink-0 ltr:mr-3 rtl:ml-3 hidden @lg:flex mt-1 `}>
@@ -669,15 +682,22 @@
 							<StatusHistory statusHistory={message?.statusHistory} />
 						{/if}
 
-						{#if message?.files && message.files?.filter((f) => f.type === 'image').length > 0}
+						{#if message?.files && message.files.length > 0}
 							<div
 								class="my-1 w-full flex overflow-x-auto gap-2 flex-wrap"
-								dir={$settings?.chatDirection ?? 'auto'}
+								dir={normalizeChatDirection($settings?.chatDirection)}
 							>
 								{#each message.files as file}
 									<div>
 										{#if file.type === 'image' || (file?.content_type ?? '').startsWith('image/')}
 											<Image src={file.url} alt={message.content} />
+										{:else if file.type === 'audio' || (file?.content_type ?? '').startsWith('audio/')}
+											<AudioAttachment
+												src={file.url}
+												name={file.name}
+												size={file?.size}
+												contentType={file?.content_type ?? ''}
+											/>
 										{:else}
 											<FileItem
 												item={file}

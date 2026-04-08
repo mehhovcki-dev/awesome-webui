@@ -167,17 +167,19 @@
 				MAX_EMBED_GIF_FAVORITES
 			);
 		}
-		favoriteGifUrls = [normalizedUrl, ...favoriteGifUrls.filter((item) => item !== normalizedUrl)].slice(
-			0,
-			MAX_EMBED_GIF_FAVORITES
-		);
+		favoriteGifUrls = [
+			normalizedUrl,
+			...favoriteGifUrls.filter((item) => item !== normalizedUrl)
+		].slice(0, MAX_EMBED_GIF_FAVORITES);
 
 		persistGifFavorites();
 		toast.success($i18n.t('Added to GIF favorites'));
 	};
 
 	const parseYouTubeTime = (value: string) => {
-		const raw = String(value ?? '').trim().toLowerCase();
+		const raw = String(value ?? '')
+			.trim()
+			.toLowerCase();
 		if (!raw) {
 			return 0;
 		}
@@ -249,7 +251,8 @@
 		const rawValue = String(urlValue ?? '').trim();
 		if (
 			forceImage &&
-			(rawValue.toLowerCase().startsWith('data:image/') || rawValue.toLowerCase().startsWith('blob:'))
+			(rawValue.toLowerCase().startsWith('data:image/') ||
+				rawValue.toLowerCase().startsWith('blob:'))
 		) {
 			return { kind: 'image' as EmbedKind, src: rawValue };
 		}
@@ -296,16 +299,16 @@
 			return { kind: 'video' as EmbedKind, src: url.toString() };
 		}
 
-			if (hasKnownExtension(url, AUDIO_EXTENSIONS)) {
-				return { kind: 'audio' as EmbedKind, src: url.toString() };
-			}
+		if (hasKnownExtension(url, AUDIO_EXTENSIONS)) {
+			return { kind: 'audio' as EmbedKind, src: url.toString() };
+		}
 
-			if (forceImage) {
-				return { kind: 'image' as EmbedKind, src: url.toString() };
-			}
+		if (forceImage) {
+			return { kind: 'image' as EmbedKind, src: url.toString() };
+		}
 
-			return { kind: 'none' as EmbedKind, src: '' };
-		};
+		return { kind: 'none' as EmbedKind, src: '' };
+	};
 
 	const isGifImageUrl = (urlValue: string) => {
 		const parsed = parseHttpUrl(urlValue);
@@ -361,21 +364,21 @@
 					}}
 					aria-label={$i18n.t('Show image preview')}
 				>
-						<img
-							src={embed.src}
-							alt={alt || 'Embedded GIF'}
-							class="w-full max-h-[26rem] rounded-xl border border-gray-200 dark:border-gray-800 object-contain bg-black/5 dark:bg-black/20"
-							loading="lazy"
-							draggable="false"
+					<img
+						src={embed.src}
+						alt={alt || 'Embedded GIF'}
+						class="w-full max-h-[26rem] rounded-xl border border-gray-200 dark:border-gray-800 object-contain bg-black/5 dark:bg-black/20"
+						loading="lazy"
+						draggable="false"
 					/>
 				</button>
 
-					<button
-						type="button"
-						class={`absolute z-20 pointer-events-auto top-2 right-2 rounded-full bg-white/95 dark:bg-gray-900/95 p-1.5 border border-gray-200/90 dark:border-gray-700/90 transition ${embeddedGifFavorited ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover/gif-embed:opacity-100'}`}
-						on:click|stopPropagation={() => {
-							toggleEmbeddedGifFavorite(embed.src);
-						}}
+				<button
+					type="button"
+					class={`absolute z-20 pointer-events-auto top-2 right-2 rounded-full bg-white/95 dark:bg-gray-900/95 p-1.5 border border-gray-200/90 dark:border-gray-700/90 transition ${embeddedGifFavorited ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover/gif-embed:opacity-100'}`}
+					on:click|stopPropagation={() => {
+						toggleEmbeddedGifFavorite(embed.src);
+					}}
 					aria-label={embeddedGifFavorited
 						? $i18n.t('Remove from favorites')
 						: $i18n.t('Add to favorites')}
@@ -397,7 +400,9 @@
 					aria-label={$i18n.t('Close preview')}
 				></button>
 
-				<div class="absolute inset-x-0 top-0 z-20 flex items-center justify-between p-3 pointer-events-none">
+				<div
+					class="absolute inset-x-0 top-0 z-20 flex items-center justify-between p-3 pointer-events-none"
+				>
 					<button
 						type="button"
 						class="rounded-full bg-black/70 border border-white/20 p-2 pointer-events-auto"
@@ -424,12 +429,12 @@
 					</button>
 				</div>
 
-					<img
-						src={embed.src}
-						alt={alt || 'Embedded GIF preview'}
-						class="relative z-10 max-w-full max-h-full object-contain p-4"
-						draggable="false"
-					/>
+				<img
+					src={embed.src}
+					alt={alt || 'Embedded GIF preview'}
+					class="relative z-10 max-w-full max-h-full object-contain p-4"
+					draggable="false"
+				/>
 			</div>
 		{/if}
 	{:else}
@@ -437,7 +442,7 @@
 			<Image src={embed.src} alt={alt || 'Embedded image'} />
 		</span>
 	{/if}
-	{:else if embed.kind === 'video'}
+{:else if embed.kind === 'video'}
 	<span class="block mt-2 max-w-full">
 		<video
 			src={embed.src}
@@ -456,7 +461,9 @@
 		</audio>
 	</span>
 {:else if embed.kind === 'youtube'}
-	<span class="block mt-2 w-full max-w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
+	<span
+		class="block mt-2 w-full max-w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800"
+	>
 		<iframe
 			src={embed.src}
 			title="YouTube embed"
@@ -467,7 +474,9 @@
 		></iframe>
 	</span>
 {:else if embed.kind === 'spotify'}
-	<span class="block mt-2 w-full max-w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
+	<span
+		class="block mt-2 w-full max-w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800"
+	>
 		<iframe
 			src={embed.src}
 			title="Spotify embed"
@@ -477,7 +486,9 @@
 		></iframe>
 	</span>
 {:else if embed.kind === 'soundcloud'}
-	<span class="block mt-2 w-full max-w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800">
+	<span
+		class="block mt-2 w-full max-w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800"
+	>
 		<iframe
 			src={embed.src}
 			title="SoundCloud embed"

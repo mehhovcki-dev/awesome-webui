@@ -589,9 +589,7 @@
 											<Textarea
 												className="w-full text-sm outline-hidden"
 												bind:value={additionalJson}
-												placeholder={$i18n.t(
-													'Enter additional JSON object for request body'
-												)}
+												placeholder={$i18n.t('Enter additional JSON object for request body')}
 												required={false}
 											/>
 										</Tooltip>

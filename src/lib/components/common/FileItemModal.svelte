@@ -114,7 +114,11 @@
 		(item?.name && item?.name.toLowerCase().endsWith('.wav')) ||
 		(item?.name && item?.name.toLowerCase().endsWith('.ogg')) ||
 		(item?.name && item?.name.toLowerCase().endsWith('.m4a')) ||
-		(item?.name && item?.name.toLowerCase().endsWith('.webm'));
+		(item?.name && item?.name.toLowerCase().endsWith('.webm')) ||
+		(item?.name && item?.name.toLowerCase().endsWith('.flac')) ||
+		(item?.name && item?.name.toLowerCase().endsWith('.opus')) ||
+		(item?.name && item?.name.toLowerCase().endsWith('.aac')) ||
+		(item?.name && item?.name.toLowerCase().endsWith('.oga'));
 
 	$: isImage =
 		(item?.meta?.content_type ?? '').startsWith('image/') ||

@@ -60,7 +60,9 @@
 		const codepointToShortCode: Record<string, string> = {};
 		const customShortCodes = new Set<string>();
 
-		for (const customEmoji of Array.isArray($config?.ui?.custom_emojis) ? $config.ui.custom_emojis : []) {
+		for (const customEmoji of Array.isArray($config?.ui?.custom_emojis)
+			? $config.ui.custom_emojis
+			: []) {
 			const shortCode = normalizeShortCode(customEmoji?.name ?? '');
 			const dataUrl = String(customEmoji?.data_url ?? '').trim();
 			if (shortCode && dataUrl.startsWith('data:image/')) {

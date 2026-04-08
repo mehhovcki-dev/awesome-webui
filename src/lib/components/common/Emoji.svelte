@@ -18,7 +18,8 @@
 			(item) =>
 				String(item?.name ?? '')
 					.trim()
-					.toLowerCase() === normalizedShortCode && String(item?.data_url ?? '').startsWith('data:image/')
+					.toLowerCase() === normalizedShortCode &&
+				String(item?.data_url ?? '').startsWith('data:image/')
 		) ?? null;
 
 	$: standardEmojiCodepoint =

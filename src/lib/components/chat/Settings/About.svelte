@@ -67,10 +67,7 @@
 						</Tooltip>
 
 						{#if $config?.features?.enable_version_update_check}
-							<a
-								href={`${WEBUI_RELEASES_URL}/tag/v${version.latest}`}
-								target="_blank"
-							>
+							<a href={`${WEBUI_RELEASES_URL}/tag/v${version.latest}`} target="_blank">
 								{updateAvailable === null
 									? $i18n.t('Checking for updates...')
 									: updateAvailable
@@ -164,9 +161,7 @@
 					href="https://openwebui.com"
 					target="_blank"
 					class="underline">Open WebUI Inc.</a
-				> <a href={`${WEBUI_GITHUB_URL}/blob/main/LICENSE`} target="_blank"
-					>All rights reserved.</a
-				>
+				> <a href={`${WEBUI_GITHUB_URL}/blob/main/LICENSE`} target="_blank">All rights reserved.</a>
 </pre>
 		</div>
 

@@ -557,7 +557,7 @@
 		const currentUrl = new URL(window.location.href);
 		return Boolean(
 			(currentUrl.searchParams.get('oauth_linked') || '').trim() ||
-				(currentUrl.searchParams.get('oauth_link_error') || '').trim()
+			(currentUrl.searchParams.get('oauth_link_error') || '').trim()
 		);
 	};
 
@@ -983,5 +983,4 @@
 		-ms-overflow-style: none; /* IE and Edge */
 		scrollbar-width: none; /* Firefox */
 	}
-
 </style>

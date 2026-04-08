@@ -265,12 +265,15 @@
 												updateOpenAIHandler();
 											}}
 											onDelete={() => {
-												OPENAI_API_BASE_URLS = OPENAI_API_BASE_URLS.filter((url, urlIdx) => idx !== urlIdx);
+												OPENAI_API_BASE_URLS = OPENAI_API_BASE_URLS.filter(
+													(url, urlIdx) => idx !== urlIdx
+												);
 												OPENAI_API_KEYS = OPENAI_API_KEYS.filter((key, keyIdx) => idx !== keyIdx);
 
 												let newConfig = {};
 												for (let newIdx = 0; newIdx < OPENAI_API_BASE_URLS.length; newIdx++) {
-													newConfig[newIdx] = OPENAI_API_CONFIGS[newIdx < idx ? newIdx : newIdx + 1];
+													newConfig[newIdx] =
+														OPENAI_API_CONFIGS[newIdx < idx ? newIdx : newIdx + 1];
 												}
 												OPENAI_API_CONFIGS = newConfig;
 												updateOpenAIHandler();
@@ -317,8 +320,8 @@
 								{$i18n.t('Added Connections')}
 							</div>
 
-								<div class="flex flex-col divide-y divide-gray-100/70 dark:divide-gray-850/70">
-									{#each OLLAMA_BASE_URLS as connectionUrl, idx (`${connectionUrl}-${idx}`)}
+							<div class="flex flex-col divide-y divide-gray-100/70 dark:divide-gray-850/70">
+								{#each OLLAMA_BASE_URLS as connectionUrl, idx (`${connectionUrl}-${idx}`)}
 									<div class="py-2">
 										<OllamaConnection
 											bind:url={OLLAMA_BASE_URLS[idx]}
@@ -332,7 +335,8 @@
 
 												let newConfig = {};
 												for (let newIdx = 0; newIdx < OLLAMA_BASE_URLS.length; newIdx++) {
-													newConfig[newIdx] = OLLAMA_API_CONFIGS[newIdx < idx ? newIdx : newIdx + 1];
+													newConfig[newIdx] =
+														OLLAMA_API_CONFIGS[newIdx < idx ? newIdx : newIdx + 1];
 												}
 												OLLAMA_API_CONFIGS = newConfig;
 											}}

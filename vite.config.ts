@@ -3,6 +3,8 @@ import { defineConfig } from 'vite';
 
 import { viteStaticCopy } from 'vite-plugin-static-copy';
 
+const isUltraFastBuild = process.env.ULTRAFAST_BUILD === 'true';
+
 export default defineConfig({
 	plugins: [
 		sveltekit(),
@@ -21,7 +23,10 @@ export default defineConfig({
 		APP_BUILD_HASH: JSON.stringify(process.env.APP_BUILD_HASH || 'dev-build')
 	},
 	build: {
-		sourcemap: true
+		sourcemap: !isUltraFastBuild,
+		minify: isUltraFastBuild ? false : 'esbuild',
+		cssMinify: isUltraFastBuild ? false : 'esbuild',
+		reportCompressedSize: !isUltraFastBuild
 	},
 	worker: {
 		format: 'es'

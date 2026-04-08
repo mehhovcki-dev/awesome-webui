@@ -914,6 +914,14 @@ try:
 except ValueError:
     WEBSOCKET_SERVER_PING_INTERVAL = 25
 
+WEBSOCKET_EVENT_CALLER_TIMEOUT = os.environ.get(
+    "WEBSOCKET_EVENT_CALLER_TIMEOUT", "60"
+)
+try:
+    WEBSOCKET_EVENT_CALLER_TIMEOUT = int(WEBSOCKET_EVENT_CALLER_TIMEOUT)
+except ValueError:
+    WEBSOCKET_EVENT_CALLER_TIMEOUT = 60
+
 
 REQUESTS_VERIFY = os.environ.get("REQUESTS_VERIFY", "True").lower() == "true"
 
@@ -959,6 +967,19 @@ else:
         )
     except Exception:
         AIOHTTP_CLIENT_TIMEOUT_TOOL_SERVER_DATA = 10
+
+
+AIOHTTP_CLIENT_TIMEOUT_TOOL_SERVER = os.environ.get(
+    "AIOHTTP_CLIENT_TIMEOUT_TOOL_SERVER", ""
+)
+
+if AIOHTTP_CLIENT_TIMEOUT_TOOL_SERVER == "":
+    AIOHTTP_CLIENT_TIMEOUT_TOOL_SERVER = AIOHTTP_CLIENT_TIMEOUT
+else:
+    try:
+        AIOHTTP_CLIENT_TIMEOUT_TOOL_SERVER = int(AIOHTTP_CLIENT_TIMEOUT_TOOL_SERVER)
+    except Exception:
+        AIOHTTP_CLIENT_TIMEOUT_TOOL_SERVER = AIOHTTP_CLIENT_TIMEOUT
 
 
 AIOHTTP_CLIENT_SESSION_TOOL_SERVER_SSL = (
@@ -1100,6 +1121,12 @@ AUDIT_EXCLUDED_PATHS = os.getenv("AUDIT_EXCLUDED_PATHS", "/chats,/chat,/folders"
 AUDIT_EXCLUDED_PATHS = [path.strip() for path in AUDIT_EXCLUDED_PATHS]
 AUDIT_EXCLUDED_PATHS = [path.lstrip("/") for path in AUDIT_EXCLUDED_PATHS]
 
+# Comma separated list for urls to include in audit.
+# If set, this acts as a whitelist and takes precedence over exclusions.
+AUDIT_INCLUDED_PATHS = os.getenv("AUDIT_INCLUDED_PATHS", "").split(",")
+AUDIT_INCLUDED_PATHS = [path.strip() for path in AUDIT_INCLUDED_PATHS if path.strip()]
+AUDIT_INCLUDED_PATHS = [path.lstrip("/") for path in AUDIT_INCLUDED_PATHS]
+
 
 ####################################
 # OPENTELEMETRY
@@ -1165,9 +1192,20 @@ OTEL_METRICS_OTLP_SPAN_EXPORTER = os.environ.get(
     "OTEL_METRICS_OTLP_SPAN_EXPORTER", OTEL_OTLP_SPAN_EXPORTER
 ).lower()  # grpc or http
 
+try:
+    OTEL_METRICS_EXPORT_INTERVAL_MILLIS = int(
+        os.environ.get("OTEL_METRICS_EXPORT_INTERVAL_MILLIS", "60000")
+    )
+except ValueError:
+    OTEL_METRICS_EXPORT_INTERVAL_MILLIS = 60000
+
 OTEL_LOGS_OTLP_SPAN_EXPORTER = os.environ.get(
     "OTEL_LOGS_OTLP_SPAN_EXPORTER", OTEL_OTLP_SPAN_EXPORTER
 ).lower()  # grpc or http
+
+ENABLE_RESPONSES_API_STATEFUL = (
+    os.environ.get("ENABLE_RESPONSES_API_STATEFUL", "False").lower() == "true"
+)
 
 ####################################
 # TOOLS/FUNCTIONS PIP OPTIONS

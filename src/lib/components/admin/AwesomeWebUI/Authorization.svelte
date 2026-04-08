@@ -595,10 +595,7 @@
 									{$i18n.t('Allow users to sign in with configured OAuth/SSO providers.')}
 								</div>
 							</div>
-							<Switch
-								bind:state={adminConfig.ENABLE_OAUTH_LOGIN}
-								on:change={queueToggleAutoSave}
-							/>
+							<Switch bind:state={adminConfig.ENABLE_OAUTH_LOGIN} on:change={queueToggleAutoSave} />
 						</div>
 
 						<div

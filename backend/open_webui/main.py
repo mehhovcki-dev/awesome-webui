@@ -88,6 +88,7 @@ from open_webui.routers import (
     functions,
     memories,
     models,
+    model_health,
     knowledge,
     prompts,
     evaluations,
@@ -114,6 +115,7 @@ from open_webui.models.functions import Functions
 from open_webui.models.models import Models
 from open_webui.models.users import UserModel, Users
 from open_webui.models.chats import Chats
+from open_webui.utils.model_health import model_health_monitor
 
 from open_webui.config import (
     # Ollama
@@ -563,6 +565,7 @@ from open_webui.env import (
     ENABLE_CUSTOM_MODEL_FALLBACK,
     LICENSE_KEY,
     AUDIT_EXCLUDED_PATHS,
+    AUDIT_INCLUDED_PATHS,
     AUDIT_LOG_LEVEL,
     CHANGELOG,
     REDIS_URL,
@@ -745,6 +748,7 @@ async def lifespan(app: FastAPI):
 
     asyncio.create_task(periodic_usage_pool_cleanup())
     asyncio.create_task(periodic_session_pool_cleanup())
+    app.state.model_health_monitor_task = asyncio.create_task(model_health_monitor(app))
 
     if app.state.config.ENABLE_BASE_MODELS_CACHE:
         try:
@@ -803,6 +807,8 @@ async def lifespan(app: FastAPI):
 
     if hasattr(app.state, "redis_task_command_listener"):
         app.state.redis_task_command_listener.cancel()
+    if hasattr(app.state, "model_health_monitor_task"):
+        app.state.model_health_monitor_task.cancel()
 
 
 app = FastAPI(
@@ -1738,6 +1744,8 @@ app.include_router(notes.router, prefix="/api/v1/notes", tags=["notes"])
 
 
 app.include_router(models.router, prefix="/api/v1/models", tags=["models"])
+app.include_router(model_health.router, prefix="/api/model-health", tags=["model-health"])
+app.include_router(model_health.router, prefix="/api/v1/model-health", tags=["model-health"])
 app.include_router(knowledge.router, prefix="/api/v1/knowledge", tags=["knowledge"])
 app.include_router(prompts.router, prefix="/api/v1/prompts", tags=["prompts"])
 app.include_router(tools.router, prefix="/api/v1/tools", tags=["tools"])
@@ -1772,6 +1780,7 @@ if audit_level != AuditLevel.NONE:
         AuditLoggingMiddleware,
         audit_level=audit_level,
         excluded_paths=AUDIT_EXCLUDED_PATHS,
+        included_paths=AUDIT_INCLUDED_PATHS,
         max_body_size=MAX_BODY_LOG_SIZE,
     )
 ##################################
