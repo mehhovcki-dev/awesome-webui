@@ -765,24 +765,33 @@ async def update_password(
     # Trusted-header auth mode delegates passwords to the reverse proxy
     if WEBUI_AUTH_TRUSTED_EMAIL_HEADER:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=ERROR_MESSAGES.ACTION_PROHIBITED)
-    if session_user:
+    if not session_user:
+        raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
+
+    auth = await Auths.get_auth_by_id(session_user.id, db=db)
+    if not auth:
+        raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
+
+    # Awesome WebUI: SSO users with no password and forced-reset accounts set an
+    # initial password without proving a current one; everyone else must verify.
+    requires_current_password = bool(auth.password) and not auth.password_change_required
+
+    if requires_current_password:
         user = await Auths.authenticate_user(
             session_user.email,
-            lambda pw: verify_password(form_data.password, pw),
+            lambda pw: verify_password(form_data.password or '', pw),
             db=db,
         )
-
-        if user:
-            try:
-                validate_password(form_data.new_password)
-            except Exception as e:
-                raise HTTPException(400, detail=str(e))
-            hashed = get_password_hash(form_data.new_password)
-            return await Auths.update_user_password_by_id(user.id, hashed, db=db)
-        else:
+        if not user:
             raise HTTPException(400, detail=ERROR_MESSAGES.INCORRECT_PASSWORD)
-    else:
-        raise HTTPException(400, detail=ERROR_MESSAGES.INVALID_CRED)
+
+    try:
+        validate_password(form_data.new_password)
+    except Exception as e:
+        raise HTTPException(400, detail=str(e))
+
+    hashed = get_password_hash(form_data.new_password)
+    return await Auths.update_user_password_by_id(session_user.id, hashed, db=db)
 
 
 ############################

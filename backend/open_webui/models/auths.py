@@ -74,7 +74,9 @@ class ProfileImageUrlForm(BaseModel):
 
 
 class UpdatePasswordForm(BaseModel):
-    password: str
+    # Awesome WebUI: optional so SSO users / forced resets can set an initial
+    # password without proving a current one they don't have.
+    password: str | None = None
     new_password: str
 
 
